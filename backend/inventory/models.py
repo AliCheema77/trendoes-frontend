@@ -76,7 +76,7 @@ BRAND_TYPE = (
     ("1", "National"),
     ("2", "International"),
     ("3", "Both")
-)
+)  
 class Brand(models.Model):
     name = models.CharField(max_length=30)
     description = models.TextField()

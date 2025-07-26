@@ -113,8 +113,8 @@ class ImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    class Media:
-        js = ('inventory/js/product_admin.js',)
+    # class Media:
+    #     js = ('inventory/js/product_admin.js',)
 
     inlines = [ImageInline]
 

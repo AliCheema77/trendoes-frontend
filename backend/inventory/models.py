@@ -92,6 +92,19 @@ class Brand(models.Model):
         verbose_name_plural = "Brands"
 
 
+class Tag(models.Model):
+    name = models.CharField(max_length=30)
+    description = models.TextField()
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Tag"
+        verbose_name_plural = "Tags"
+
+
 class Product(models.Model):
     name = models.CharField(max_length=50)
     description = models.TextField()
@@ -101,6 +114,10 @@ class Product(models.Model):
     color = models.ForeignKey(Color, on_delete=models.CASCADE)
     size = models.ForeignKey(Size, on_delete=models.CASCADE)
     gender = models.ForeignKey(Gender, on_delete=models.CASCADE)
+    tag = models.ManyToManyField(Tag, blank=True)
+    brand = models.ForeignKey(
+        Brand, on_delete=models.CASCADE, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,8 +1,8 @@
 from django.db import models
-
+from .validators import validate_hex_color
 
 class Category(models.Model):
-    name = models.CharField(max_length=30)
+    name = models.CharField(max_length=255, verbose_name="Category Name")
     description = models.TextField()
     active = models.BooleanField(default=True)
 
@@ -18,7 +18,7 @@ class SubCategory(models.Model):
     name = models.CharField(max_length=30)
     description = models.TextField()
     active = models.BooleanField(default=True)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
 
     def __str__(self):
         return self.name
@@ -30,7 +30,7 @@ class SubCategory(models.Model):
 
 class Color(models.Model):
     name = models.CharField(max_length=30)
-    hex_code = models.CharField(max_length=6, unique=True)
+    hex_code = models.CharField(max_length=7, validators=[validate_hex_color], verbose_name="Color Hex")
     rgb_code = models.CharField(
         max_length=10, unique=True, help_text="rgb color code"
     )
@@ -53,6 +53,10 @@ class Size(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        self.size_code = self.size_code.upper()
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = "Size"

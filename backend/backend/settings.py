@@ -40,12 +40,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "inventory",
-    "accounts",
     'admin_interface',
     'colorfield',
     'ckeditor',
     'ckeditor_uploader',
     'django_ckeditor_5',
+    "invoice",
 
 ]
 

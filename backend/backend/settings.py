@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+from .ckeditorconfig import *
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,7 +45,12 @@ INSTALLED_APPS = [
     'colorfield',
     'ckeditor',
     'ckeditor_uploader',
+    'django_ckeditor_5',
+
 ]
+
+
+
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -133,3 +139,11 @@ CKEDITOR_UPLOAD_PATH = "uploads/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'inventory.throttles.ProductListSellThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'custom_ip': '10/minute',
+    }
+}

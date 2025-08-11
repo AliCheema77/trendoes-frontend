@@ -15,6 +15,7 @@ class ProductForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        print(cleaned_data)
         category = cleaned_data.get("category")
         subcategory = cleaned_data.get("subcategory")
         color = cleaned_data.get("color")

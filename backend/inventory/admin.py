@@ -16,10 +16,11 @@ class StockInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     form = ProductForm
-    list_display = ['name', 'category', 'subcategory', 'brand', 'actual_price', 'discount_percent', 'price']
+    list_display = ['name', 'category', 'subcategory', 'brand', 'actual_price', 'discount_percent', 'price', "total_sold"]
     list_filter = ['category', 'subcategory', 'brand', 'gender']
     search_fields = ['name']
     inlines = [ImageInline, StockInline]
+    
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):

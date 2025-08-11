@@ -72,8 +72,8 @@ class ProductSerializer(serializers.ModelSerializer):
     stocks = serializers.SerializerMethodField()
     pricing = serializers.SerializerMethodField()
     meta = serializers.SerializerMethodField()
-    ratingValue = serializers.SerializerMethodField()
-    totalReviews = serializers.SerializerMethodField()
+    ratingValue = serializers.FloatField(read_only=True, default=0.0)
+    totalReviews = serializers.IntegerField(read_only=True, default=0)
 
     def get_stocks(self, obj):
         stocks = obj.stocks.all()
@@ -109,14 +109,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return {
             "createdAt": obj.created_at.isoformat() if hasattr(obj, 'created_at') else None,
             "updatedAt": obj.updated_at.isoformat() if hasattr(obj, 'updated_at') else None,
-            "isActive": getattr(obj, 'active', True)
+            "isActive": getattr(obj, 'is_active', True)
         }
-
-    def get_ratingValue(self, obj):
-        return 4.8
-
-    def get_totalReviews(self, obj):
-        return 300
 
     class Meta:
         model = Product

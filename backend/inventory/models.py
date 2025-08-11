@@ -61,10 +61,10 @@ class Product(models.Model):
     actual_price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     price = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
-    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)  # set once
-    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)      # auto-update
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)  
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)      
     is_active = models.BooleanField(default=True, null=True, blank=True)     
-
+    total_sold = models.PositiveIntegerField(null=True, blank = True)
     def save(self, *args, **kwargs):
         discount = self.discount_percent / Decimal('100')
         self.price = self.actual_price * (Decimal('1.0') - discount)

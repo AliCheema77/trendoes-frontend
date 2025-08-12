@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'ckeditor',
     'ckeditor_uploader',
     'django_ckeditor_5',
-    "invoice",
+    "invoice.apps.InvoiceConfig", 
 
 ]
 
@@ -145,5 +145,11 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'custom_ip': '10/minute',
+        "product_detail": "8/minute",
     }
 }
+
+# Email Configuration (for development)
+# This will print emails to the console where you run `manage.py runserver`
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "Trendoes <officecc312@gmail.com>"

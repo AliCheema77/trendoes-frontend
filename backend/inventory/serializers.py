@@ -74,6 +74,7 @@ class ProductSerializer(serializers.ModelSerializer):
     meta = serializers.SerializerMethodField()
     ratingValue = serializers.FloatField(read_only=True, default=0.0)
     totalReviews = serializers.IntegerField(read_only=True, default=0)
+    total_sold = serializers.IntegerField(allow_null = True)
 
     def get_stocks(self, obj):
         stocks = obj.stocks.all()
@@ -116,5 +117,5 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'name', 'category', 'subcategory', 'gender', 'brand', 'color',
-            'description', 'pricing', 'images', 'stocks', 'meta', 'ratingValue', 'totalReviews'
+            'description', 'pricing', 'images', 'stocks', 'meta', 'ratingValue', 'totalReviews', "total_sold",
         ]

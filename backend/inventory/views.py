@@ -27,8 +27,9 @@ class ProductListSellView(APIView):
             products = products.filter(price__gte=min_price)
         if max_price:
             products = products.filter(price__lte=max_price)
-
+        # print("inside views for product\n",products)
         serializer = ProductSerializer(products, many=True, context={'request': request})
+
         return Response(serializer.data, status=status.HTTP_200_OK)
     def post(self, request):
         pass
@@ -47,3 +48,11 @@ class ProductDetailView(generics.RetrieveAPIView):
         Prefetch('stocks', queryset=Stock.objects.select_related('size', 'color'))
     )
     
+
+class BestProductsListView(APIView):
+    throttle_classes = [ProductListSellThrottle]
+
+    def get(self, request):
+        best_seller = Product.objects.order_by('-total_sold')[:5]
+        serializer = ProductSerializer(best_seller, many = True, context = {"request":request})
+        return Response(serializer.data, status = status.HTTP_200_OK)

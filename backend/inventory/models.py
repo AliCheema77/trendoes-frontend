@@ -1,95 +1,54 @@
 from django.db import models
+from decimal import Decimal
+from django_ckeditor_5.fields import CKEditor5Field
 
 
 class Category(models.Model):
-    name = models.CharField(max_length=30)
-    description = models.TextField()
-    active = models.BooleanField(default=True)
+    name = models.CharField(max_length=100)
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        verbose_name = "Category"
-        verbose_name_plural = "Categories"
-
 
 class SubCategory(models.Model):
-    name = models.CharField(max_length=30)
-    description = models.TextField()
-    active = models.BooleanField(default=True)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
 
     def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = "Sub Category"
-        verbose_name_plural = "Sub Categories"
-
+        return f"{self.category.name} - {self.name}"
 
 class Color(models.Model):
-    name = models.CharField(max_length=30)
-    hex_code = models.CharField(max_length=6, unique=True)
-    rgb_code = models.CharField(
-        max_length=10, unique=True, help_text="rgb color code"
-    )
-    description = models.TextField()
-    active = models.BooleanField(default=True)
+    name = models.CharField(max_length=100)
+    rgb_code = models.CharField(max_length=10, unique=True, help_text="rgb color code", null=True, blank=True)
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        verbose_name = "Color"
-        verbose_name_plural = "Colors"
-
 
 class Size(models.Model):
-    name = models.CharField(max_length=30)
-    size_code = models.CharField(max_length=3, unique=True)
-    description = models.TextField()
-    active = models.BooleanField(default=True)
+    name = models.CharField(max_length=100)
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        verbose_name = "Size"
-        verbose_name_plural = "Sizes"
-
 
 class Gender(models.Model):
-    name = models.CharField(max_length=10, unique=True)
-    description = models.TextField()
-    active = models.BooleanField(default=True)
+    name = models.CharField(max_length=100)
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        verbose_name = "Gender"
-        verbose_name_plural = "Genders"
-
 
 BRAND_TYPE = (
     ("1", "National"),
     ("2", "International"),
     ("3", "Both")
-)  
+)
+
 class Brand(models.Model):
-    name = models.CharField(max_length=30)
-    description = models.TextField()
-    origin = models.CharField(choices=BRAND_TYPE, max_length=13)
+    name = models.CharField(max_length=100)
+    origin = models.CharField(choices=BRAND_TYPE, max_length=13, null=True, blank=True)
     logo = models.ImageField(upload_to="brand_logo", null=True, blank=True)
-    active = models.BooleanField(default=True)
+    active = models.BooleanField(default=True, null=True, blank=True)
 
     def __str__(self):
         return self.name
-
-    class Meta:
-        verbose_name = "Brand"
-        verbose_name_plural = "Brands"
 
 
 class Tag(models.Model):
@@ -104,39 +63,54 @@ class Tag(models.Model):
         verbose_name = "Tag"
         verbose_name_plural = "Tags"
 
-
+        
 class Product(models.Model):
-    name = models.CharField(max_length=50)
-    description = models.TextField()
-    active = models.BooleanField(default=True)
+    name = models.CharField(max_length=255)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
-    sub_category = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
-    color = models.ForeignKey(Color, on_delete=models.CASCADE)
-    size = models.ForeignKey(Size, on_delete=models.CASCADE)
-    gender = models.ForeignKey(Gender, on_delete=models.CASCADE)
-    tag = models.ManyToManyField(Tag, blank=True)
-    brand = models.ForeignKey(
-        Brand, on_delete=models.CASCADE, null=True, blank=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
+    gender = models.ForeignKey(Gender, on_delete=models.SET_NULL, null=True, blank=True)
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
+    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
+    description = models.TextField(blank=True, null=True)
+    actual_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
+    price = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)  
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)      
+    is_active = models.BooleanField(default=True, null=True, blank=True)     
+    total_sold = models.PositiveIntegerField(null=True, blank = True)
+    def save(self, *args, **kwargs):
+        discount = self.discount_percent / Decimal('100')
+        self.price = self.actual_price * (Decimal('1.0') - discount)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
 
-    class Meta:
-        verbose_name = "Product"
-        verbose_name_plural = "Products"
-
-
 class Image(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    image = models.ImageField(upload_to="product_images")
-    description = models.TextField()
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='products/')
 
     def __str__(self):
-        return self.product.name
+        return f"Image for {self.product.name}"
+
+class Stock(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stocks')
+    size = models.ForeignKey(Size, on_delete=models.CASCADE)
+    color = models.ForeignKey(Color, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
 
     class Meta:
-        verbose_name = "Image"
-        verbose_name_plural = "Images"
+        unique_together = ('product', 'size', 'color')
+
+    def __str__(self):
+        return f"{self.product.name} - {self.size.name} - {self.color.name} - {self.quantity}"
+
+class Review(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    name = models.CharField(max_length=100)
+    rating = models.PositiveIntegerField()
+    comment = models.TextField()
+
+    def __str__(self):
+        return f"{self.name} - {self.rating} Stars"

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+from .ckeditorconfig import *
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,10 +40,17 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "inventory",
-    "accounts",
     'admin_interface',
     'colorfield',
+    'ckeditor',
+    'ckeditor_uploader',
+    'django_ckeditor_5',
+    "invoice.apps.InvoiceConfig", 
+
 ]
+
+
+
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -119,8 +127,29 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "inventory", "static"),  # For inventory app
 ]
 
+# Media files (for CKEditor uploads and other media)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# CKEditor upload path (relative to MEDIA_ROOT)
+CKEDITOR_UPLOAD_PATH = "uploads/"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'inventory.throttles.ProductListSellThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'custom_ip': '10/minute',
+        "product_detail": "8/minute",
+    }
+}
+
+# Email Configuration (for development)
+# This will print emails to the console where you run `manage.py runserver`
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "Trendoes <officecc312@gmail.com>"

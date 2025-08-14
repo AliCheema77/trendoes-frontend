@@ -5,23 +5,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const colorFieldRow = document.querySelector('.form-row.field-color');
 
     function toggleFields() {
-        console.log("JS loaded");
+        if (!categoryField) return;
 
-        const selected = categoryField.options[categoryField.selectedIndex].text.toLowerCase();
+        const selectedOption = categoryField.options[categoryField.selectedIndex];
+        if (!selectedOption) return;
 
-        if (selected === 'perfume') {
-            sizeFieldRow.style.display = 'none';
-            genderFieldRow.style.display = 'none';
-            colorFieldRow.style.display = 'none';
-        } else {
-            sizeFieldRow.style.display = '';
-            genderFieldRow.style.display = '';
-            colorFieldRow.style.display = '';
-        }
+        const selected = selectedOption.text.trim().toLowerCase();
+        console.log("Selected Category:", selected);
+
+        const isPerfume = selected === 'perfumes';
+
+        sizeFieldRow.style.display = isPerfume ? 'none' : '';
+        genderFieldRow.style.display = isPerfume ? 'none' : '';
+        colorFieldRow.style.display = isPerfume ? 'none' : '';
     }
 
     if (categoryField) {
         categoryField.addEventListener('change', toggleFields);
-        toggleFields(); // Initial call
+        // 🔥 Call once initially
+        toggleFields();
     }
 });

@@ -26,9 +26,5 @@ def produt_total_sold_increment(sender, instance, created, **kwargs):
         product_pk = instance.product.pk
         quantity_sold = instance.quantity
         Product.objects.filter(pk=product_pk).update(
-            # F('total_sold') tells the database to use the current value of the
-            # 'total_sold' field for the calculation.
-            # Coalesce('total_sold', 0) ensures that if 'total_sold' is NULL
-            # (e.g., for the first sale), it's treated as 0.
             total_sold=Coalesce(F('total_sold'), 0) + quantity_sold
         )

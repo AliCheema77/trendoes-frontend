@@ -20,7 +20,7 @@ const ModalNewsletter = () => {
     useEffect(() => {
         setTimeout(() => {
             setOpen(true)
-        }, 3000)
+        }, 60000)
     }, [])
 
     return (

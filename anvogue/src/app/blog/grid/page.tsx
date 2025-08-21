@@ -1,6 +1,5 @@
 'use client'
 import React, { useState } from 'react'
-import Image from 'next/image';
 import TopNavOne from '@/components/Header/TopNav/TopNavOne'
 import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb';
@@ -8,18 +7,11 @@ import blogData from '@/data/Blog.json'
 import BlogItem from '@/components/Blog/BlogItem';
 import Footer from '@/components/Footer/Footer'
 import HandlePagination from '@/components/Other/HandlePagination'
-import { useRouter } from 'next/navigation'
 
 const BlogGrid = () => {
     const [currentPage, setCurrentPage] = useState(0);
     const productsPerPage = 9;
     const offset = currentPage * productsPerPage;
-    const router = useRouter()
-
-    const handleBlogClick = (blogId: string) => {
-        // Go to blog detail with blogId selected
-        router.push(`/blog/detail1?id=${blogId}`);
-    };
 
     let filteredData = blogData.filter(blog => {
         let isCategoryMatched = true

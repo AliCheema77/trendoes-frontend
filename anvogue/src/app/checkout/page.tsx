@@ -2,30 +2,105 @@
 import React, { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import TopNavOne from '@/components/Header/TopNav/TopNavOne'
 import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
 import Footer from '@/components/Footer/Footer'
-import { ProductType } from '@/type/ProductType'
-import productData from '@/data/Product.json'
-import Product from '@/components/Product/Product'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { useCart } from '@/context/CartContext'
+import { useAuth } from '@/context/AuthContext'
 import { useSearchParams } from 'next/navigation';
+import { createOrder } from '@/lib/api'
+import { StockEntry } from '@/type/ProductType'
+
+function resolveStockIds(stocksRaw: StockEntry[] | undefined, sizeName: string, colorName: string) {
+    if (!stocksRaw) return { sizeId: null, colorId: null }
+    for (const s of stocksRaw) {
+        if (s.size.name === sizeName) {
+            for (const c of s.colors) {
+                if (c.color.name === colorName) return { sizeId: s.size.id, colorId: c.color.id }
+            }
+        }
+    }
+    return { sizeId: null, colorId: null }
+}
 
 const Checkout = () => {
     const searchParams = useSearchParams()
-    let discount = searchParams.get('discount')
-    let ship = searchParams.get('ship')
+    const discount = Number(searchParams.get('discount') || 0)
+    const ship = Number(searchParams.get('ship') || 0)
+    const router = useRouter()
 
-    const { cartState } = useCart();
-    let [totalCart, setTotalCart] = useState<number>(0)
-    const [activePayment, setActivePayment] = useState<string>('credit-card')
+    const { cartState, removeFromCart } = useCart()
+    const { accessToken } = useAuth()
 
-    cartState.cartArray.map(item => totalCart += item.price * item.quantity)
+    const subtotal = cartState.cartArray.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const total = subtotal - discount + ship
 
-    const handlePayment = (item: string) => {
-        setActivePayment(item)
+    const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', country: '', city: '', street: '', postalCode: '', notes: '', coupon: '' })
+    const [activePayment, setActivePayment] = useState('COD')
+    const [error, setError] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setForm(prev => ({ ...prev, [e.target.id]: e.target.value }))
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError(null)
+
+        const items = cartState.cartArray.map(item => {
+            const { sizeId, colorId } = resolveStockIds(
+                item.stocksRaw,
+                item.selectedSize || item.sizes[0],
+                item.selectedColor || item.variation[0]?.color
+            )
+            return {
+                product: parseInt(item.id),
+                quantity: item.quantity,
+                size: sizeId ?? item.sizeId,
+                color: colorId ?? item.colorId,
+                price: item.price,
+            }
+        })
+
+        const missingStock = items.some(i => !i.size || !i.color)
+        if (missingStock) {
+            setError('Some items are missing size/color selection. Please update your cart.')
+            return
+        }
+
+        const payload = {
+            name: `${form.firstName} ${form.lastName}`.trim(),
+            email: form.email,
+            phone: form.phone,
+            street: form.street,
+            city: form.city,
+            postal_code: form.postalCode,
+            country: form.country,
+            payment_method: activePayment,
+            coupon_code: form.coupon || undefined,
+            notes: form.notes,
+            subtotal,
+            shipping_fee: ship,
+            discount,
+            total,
+            items,
+        }
+
+        setLoading(true)
+        try {
+            await createOrder(payload, accessToken)
+            cartState.cartArray.forEach(item => removeFromCart(item.id))
+            router.push('/order-tracking')
+        } catch (err: any) {
+            const msgs = Object.values(err || {}).flat()
+            setError(msgs.length > 0 ? (msgs[0] as string) : 'Failed to place order. Please try again.')
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
@@ -40,186 +115,73 @@ const Checkout = () => {
                     <div className="content-main flex justify-between">
                         <div className="left w-1/2">
                             <div className="login bg-surface py-3 px-4 flex justify-between rounded-lg">
-                                <div className="left flex items-center"><span className="text-on-surface-variant1 pr-4">Already have an account? </span><span className="text-button text-on-surface hover-underline cursor-pointer">Login</span></div>
-                                <div className="right"><i className="ph ph-caret-down fs-20 d-block cursor-pointer"></i></div>
-                            </div>
-                            <div className="form-login-block mt-3">
-                                <form className="p-5 border border-line rounded-lg">
-                                    <div className="grid sm:grid-cols-2 gap-5">
-                                        <div className="email ">
-                                            <input className="border-line px-4 pt-3 pb-3 w-full rounded-lg" id="username" type="email" placeholder="Username or email" required />
-                                        </div>
-                                        <div className="pass ">
-                                            <input className="border-line px-4 pt-3 pb-3 w-full rounded-lg" id="password" type="password" placeholder="Password" required />
-                                        </div>
-                                    </div>
-                                    <div className="block-button mt-3">
-                                        <button className="button-main button-blue-hover">Login</button>
-                                    </div>
-                                </form>
+                                <div className="left flex items-center">
+                                    <span className="text-on-surface-variant1 pr-4">Already have an account? </span>
+                                    <Link href="/login" className="text-button text-on-surface hover-underline">Login</Link>
+                                </div>
                             </div>
                             <div className="information mt-5">
                                 <div className="heading5">Information</div>
-                                <div className="form-checkout mt-5">
-                                    <form>
-                                        <div className="grid sm:grid-cols-2 gap-4 gap-y-5 flex-wrap">
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="firstName" type="text" placeholder="First Name *" required />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="lastName" type="text" placeholder="Last Name *" required />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="email" type="email" placeholder="Email Address *" required />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="phoneNumber" type="number" placeholder="Phone Numbers *" required />
-                                            </div>
-                                            <div className="col-span-full select-block">
-                                                <select className="border border-line px-4 py-3 w-full rounded-lg" id="region" name="region" defaultValue={'default'}>
-                                                    <option value="default" disabled>Choose Country/Region</option>
-                                                    <option value="India">India</option>
-                                                    <option value="France">France</option>
-                                                    <option value="Singapore">Singapore</option>
-                                                </select>
-                                                <Icon.CaretDown className='arrow-down' />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="city" type="text" placeholder="Town/City *" required />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="apartment" type="text" placeholder="Street,..." required />
-                                            </div>
-                                            <div className="select-block">
-                                                <select className="border border-line px-4 py-3 w-full rounded-lg" id="country" name="country" defaultValue={'default'}>
-                                                    <option value="default" disabled>Choose State</option>
-                                                    <option value="India">India</option>
-                                                    <option value="France">France</option>
-                                                    <option value="Singapore">Singapore</option>
-                                                </select>
-                                                <Icon.CaretDown className='arrow-down' />
-                                            </div>
-                                            <div className="">
-                                                <input className="border-line px-4 py-3 w-full rounded-lg" id="postal" type="text" placeholder="Postal Code *" required />
-                                            </div>
-                                            <div className="col-span-full">
-                                                <textarea className="border border-line px-4 py-3 w-full rounded-lg" id="note" name="note" placeholder="Write note..."></textarea>
-                                            </div>
+                                <form className="form-checkout mt-5" onSubmit={handleSubmit}>
+                                    {error && <div className="text-red text-sm mb-4 p-3 bg-red bg-opacity-10 rounded-lg">{error}</div>}
+                                    <div className="grid sm:grid-cols-2 gap-4 gap-y-5 flex-wrap">
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="firstName" type="text" placeholder="First Name *" required value={form.firstName} onChange={handleChange} />
                                         </div>
-                                        <div className="payment-block md:mt-10 mt-6">
-                                            <div className="heading5">Choose payment Option:</div>
-                                            <div className="list-payment mt-5">
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg ${activePayment === 'credit-card' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="credit" name="payment" checked={activePayment === 'credit-card'} onChange={() => handlePayment('credit-card')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="credit">Credit Card</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Make your payment directly into our bank account. Your order will not be shipped until the funds have cleared in our account.</div>
-                                                        <div className="row">
-                                                            <div className="col-12 mt-3">
-                                                                <label htmlFor="cardNumberCredit">Card Numbers</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="cardNumberCredit" placeholder="ex.1234567290" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="dateCredit">Date</label>
-                                                                <input className="border-line px-4 py-3 w-full rounded mt-2" type="date" id="dateCredit" name="date" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="ccvCredit">CCV</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="ccvCredit" placeholder="****" />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <input type="checkbox" id="saveCredit" name="save" />
-                                                            <label className="text-button" htmlFor="saveCredit">Save Card Details</label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg mt-5 ${activePayment === 'cash-delivery' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="delivery" name="payment" checked={activePayment === 'cash-delivery'} onChange={() => handlePayment('cash-delivery')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="delivery">Cash on delivery</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Make your payment directly into our bank account. Your order will not be shipped until the funds have cleared in our account.</div>
-                                                        <div className="row">
-                                                            <div className="col-12 mt-3">
-                                                                {/* <div className="bg-img"><Image src="assets/images/component/payment.png" alt="" /></div> */}
-                                                                <label htmlFor="cardNumberDelivery">Card Numbers</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="cardNumberDelivery" placeholder="ex.1234567290" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="dateDelivery">Date</label>
-                                                                <input className="border-line px-4 py-3 w-full rounded mt-2" type="date" id="dateDelivery" name="date" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="ccvDelivery">CCV</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="ccvDelivery" placeholder="****" />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <input type="checkbox" id="saveDelivery" name="save" />
-                                                            <label className="text-button" htmlFor="saveDelivery">Save Card Details</label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg mt-5 ${activePayment === 'apple-pay' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="apple" name="payment" checked={activePayment === 'apple-pay'} onChange={() => handlePayment('apple-pay')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="apple">Apple Pay</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Make your payment directly into our bank account. Your order will not be shipped until the funds have cleared in our account.</div>
-                                                        <div className="row">
-                                                            <div className="col-12 mt-3">
-                                                                {/* <div className="bg-img"><Image src="assets/images/component/payment.png" alt="" /></div> */}
-                                                                <label htmlFor="cardNumberApple">Card Numbers</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="cardNumberApple" placeholder="ex.1234567290" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="dateApple">Date</label>
-                                                                <input className="border-line px-4 py-3 w-full rounded mt-2" type="date" id="dateApple" name="date" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="ccvApple">CCV</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="ccvApple" placeholder="****" />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <input type="checkbox" id="saveApple" name="save" />
-                                                            <label className="text-button" htmlFor="saveApple">Save Card Details</label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg mt-5 ${activePayment === 'paypal' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="paypal" name="payment" checked={activePayment === 'paypal'} onChange={() => handlePayment('paypal')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="paypal">PayPal</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Make your payment directly into our bank account. Your order will not be shipped until the funds have cleared in our account.</div>
-                                                        <div className="row">
-                                                            <div className="col-12 mt-3">
-                                                                <label htmlFor="cardNumberPaypal">Card Numbers</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="cardNumberPaypal" placeholder="ex.1234567290" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="datePaypal">Date</label>
-                                                                <input className="border-line px-4 py-3 w-full rounded mt-2" type="date" id="datePaypal" name="date" />
-                                                            </div>
-                                                            <div className=" mt-3">
-                                                                <label htmlFor="ccvPaypal">CCV</label>
-                                                                <input className="cursor-pointer border-line px-4 py-3 w-full rounded mt-2" type="text" id="ccvPaypal" placeholder="****" />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <input type="checkbox" id="savePaypal" name="save" />
-                                                            <label className="text-button" htmlFor="savePaypal">Save Card Details</label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="lastName" type="text" placeholder="Last Name *" required value={form.lastName} onChange={handleChange} />
                                         </div>
-                                        <div className="block-button md:mt-10 mt-6">
-                                            <button className="button-main w-full">Payment</button>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="email" type="email" placeholder="Email Address *" required value={form.email} onChange={handleChange} />
                                         </div>
-                                    </form>
-                                </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="phone" type="text" placeholder="Phone Number *" required value={form.phone} onChange={handleChange} />
+                                        </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="country" type="text" placeholder="Country *" required value={form.country} onChange={handleChange} />
+                                        </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="city" type="text" placeholder="Town/City *" required value={form.city} onChange={handleChange} />
+                                        </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="street" type="text" placeholder="Street Address *" required value={form.street} onChange={handleChange} />
+                                        </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="postalCode" type="text" placeholder="Postal Code *" required value={form.postalCode} onChange={handleChange} />
+                                        </div>
+                                        <div>
+                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="coupon" type="text" placeholder="Coupon Code (optional)" value={form.coupon} onChange={handleChange} />
+                                        </div>
+                                        <div className="col-span-full">
+                                            <textarea className="border border-line px-4 py-3 w-full rounded-lg" id="notes" placeholder="Order notes (optional)" value={form.notes} onChange={handleChange as any} />
+                                        </div>
+                                    </div>
+                                    <div className="payment-block md:mt-10 mt-6">
+                                        <div className="heading5">Payment Method:</div>
+                                        <div className="list-payment mt-5">
+                                            {[
+                                                { id: 'COD', label: 'Cash on Delivery' },
+                                                { id: 'card', label: 'Credit / Debit Card' },
+                                                { id: 'bank_transfer', label: 'Bank Transfer' },
+                                            ].map(method => (
+                                                <div key={method.id} className={`type bg-surface p-5 border border-line rounded-lg mt-3 ${activePayment === method.id ? 'open' : ''}`}>
+                                                    <input className="cursor-pointer" type="radio" id={method.id} name="payment" checked={activePayment === method.id} onChange={() => setActivePayment(method.id)} />
+                                                    <label className="text-button pl-2 cursor-pointer" htmlFor={method.id}>{method.label}</label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="md:mt-10 mt-6">
+                                        <button
+                                            type="submit"
+                                            disabled={loading || cartState.cartArray.length === 0}
+                                            style={{ width: '100%', padding: '14px', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: (loading || cartState.cartArray.length === 0) ? 'not-allowed' : 'pointer', opacity: (loading || cartState.cartArray.length === 0) ? 0.7 : 1 }}
+                                        >
+                                            {loading ? 'Placing Order...' : 'Place Order'}
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-
                         </div>
                         <div className="right w-5/12">
                             <div className="checkout-block">
@@ -228,51 +190,41 @@ const Checkout = () => {
                                     {cartState.cartArray.length < 1 ? (
                                         <p className='text-button pt-3'>No product in cart</p>
                                     ) : (
-                                        cartState.cartArray.map((product) => (
-                                            <>
-                                                <div className="item flex items-center justify-between w-full pb-5 border-b border-line gap-6 mt-5">
-                                                    <div className="bg-img w-[100px] aspect-square flex-shrink-0 rounded-lg overflow-hidden">
-                                                        <Image
-                                                            src={product.thumbImage[0]}
-                                                            width={500}
-                                                            height={500}
-                                                            alt='img'
-                                                            className='w-full h-full'
-                                                        />
+                                        cartState.cartArray.map(product => (
+                                            <div key={product.id} className="item flex items-center justify-between w-full pb-5 border-b border-line gap-6 mt-5">
+                                                <div className="bg-img w-[100px] aspect-square flex-shrink-0 rounded-lg overflow-hidden">
+                                                    <Image src={product.thumbImage[0]} width={500} height={500} alt='img' className='w-full h-full object-cover' />
+                                                </div>
+                                                <div className="flex items-center justify-between w-full">
+                                                    <div>
+                                                        <div className="name text-title">{product.name}</div>
+                                                        <div className="caption1 text-secondary mt-2">
+                                                            <span className='size capitalize'>{product.selectedSize || product.sizes[0]}</span>
+                                                            <span>/</span>
+                                                            <span className='color capitalize'>{product.selectedColor || product.variation[0]?.color}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div>
-                                                            <div className="name text-title">{product.name}</div>
-                                                            <div className="caption1 text-secondary mt-2">
-                                                                <span className='size capitalize'>{product.selectedSize || product.sizes[0]}</span>
-                                                                <span>/</span>
-                                                                <span className='color capitalize'>{product.selectedColor || product.variation[0].color}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-title">
-                                                            <span className='quantity'>{product.quantity}</span>
-                                                            <span className='px-1'>x</span>
-                                                            <span>
-                                                                ${product.price}.00
-                                                            </span>
-                                                        </div>
+                                                    <div className="text-title">
+                                                        <span>{product.quantity}</span>
+                                                        <span className='px-1'>x</span>
+                                                        <span>PKR {product.price.toFixed(0)}</span>
                                                     </div>
                                                 </div>
-                                            </>
+                                            </div>
                                         ))
                                     )}
                                 </div>
                                 <div className="discount-block py-5 flex justify-between border-b border-line">
-                                    <div className="text-title">Discounts</div>
-                                    <div className="text-title">-$<span className="discount">{discount}</span><span>.00</span></div>
+                                    <div className="text-title">Discount</div>
+                                    <div className="text-title">-PKR {discount}</div>
                                 </div>
                                 <div className="ship-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">Shipping</div>
-                                    <div className="text-title">{Number(ship) === 0 ? 'Free' : `$${ship}.00`}</div>
+                                    <div className="text-title">{ship === 0 ? 'Free' : `PKR ${ship}`}</div>
                                 </div>
                                 <div className="total-cart-block pt-5 flex justify-between">
                                     <div className="heading5">Total</div>
-                                    <div className="heading5 total-cart">${totalCart - Number(discount) + Number(ship)}.00</div>
+                                    <div className="heading5">PKR {total.toFixed(0)}</div>
                                 </div>
                             </div>
                         </div>

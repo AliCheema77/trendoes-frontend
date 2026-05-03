@@ -5,6 +5,16 @@ interface Variation {
     image: string;
 }
 
+export interface StockColor {
+    color: { id: number; name: string; HEX: string }
+    quantity: number
+}
+
+export interface StockEntry {
+    size: { id: number; name: string }
+    colors: StockColor[]
+}
+
 export interface ProductType {
     id: string,
     category: string,
@@ -26,5 +36,6 @@ export interface ProductType {
     images: Array<string>,
     description: string,
     action: string,
-    slug: string
+    slug: string,
+    stocksRaw?: StockEntry[],
 }

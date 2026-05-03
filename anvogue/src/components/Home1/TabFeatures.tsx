@@ -23,20 +23,14 @@ const TabFeatures: React.FC<Props> = ({ data, start, limit }) => {
 
     const getFilterData = () => {
         if (activeTab === 'on sale') {
-            return data.filter((product) => product.sale && (product.category === 'fashion'))
+            return data.filter(p => p.sale)
         }
-
         if (activeTab === 'new arrivals') {
-            return data.filter((product) => product.new && (product.category === 'fashion'))
+            return data.filter(p => p.new)
         }
-
         if (activeTab === 'best sellers') {
-            return data
-                .filter((product) => product.category === 'fashion')
-                .slice()
-                .sort((a, b) => b.sold - a.sold)
+            return data.slice().sort((a, b) => b.sold - a.sold)
         }
-
         return data
     }
 
@@ -66,33 +60,28 @@ const TabFeatures: React.FC<Props> = ({ data, start, limit }) => {
                     </div>
 
                     <div className="list-product hide-product-sold section-swiper-navigation style-outline style-border md:mt-10 mt-6">
-                        <Swiper
-                            spaceBetween={12}
-                            slidesPerView={2}
-                            navigation
-                            loop={true}
-                            modules={[Navigation, Autoplay]}
-                            breakpoints={{
-                                576: {
-                                    slidesPerView: 2,
-                                    spaceBetween: 12,
-                                },
-                                768: {
-                                    slidesPerView: 3,
-                                    spaceBetween: 20,
-                                },
-                                1200: {
-                                    slidesPerView: 4,
-                                    spaceBetween: 30,
-                                },
-                            }}
-                        >
-                            {filteredProducts.slice(start, limit).map((prd, index) => (
-                                <SwiperSlide key={index}>
-                                    <Product data={prd} type='grid' />
-                                </SwiperSlide>
-                            ))}
-                        </Swiper>
+                        {filteredProducts.length === 0 ? (
+                            <p className="text-center text-secondary py-10">No products found.</p>
+                        ) : (
+                            <Swiper
+                                spaceBetween={12}
+                                slidesPerView={2}
+                                navigation
+                                loop={filteredProducts.slice(start, start + limit).length > 4}
+                                modules={[Navigation, Autoplay]}
+                                breakpoints={{
+                                    576: { slidesPerView: 2, spaceBetween: 12 },
+                                    768: { slidesPerView: 3, spaceBetween: 20 },
+                                    1200: { slidesPerView: 4, spaceBetween: 30 },
+                                }}
+                            >
+                                {filteredProducts.slice(start, start + limit).map((prd, index) => (
+                                    <SwiperSlide key={index}>
+                                        <Product data={prd} type='grid' />
+                                    </SwiperSlide>
+                                ))}
+                            </Swiper>
+                        )}
                     </div>
                 </div>
             </div>

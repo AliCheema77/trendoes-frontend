@@ -1,88 +1,156 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
-import productData from '@/data/Product.json'
-import { useModalQuickviewContext } from '@/context/ModalQuickviewContext';
-import Image from 'next/image';
+
+interface Promotion {
+    id: number
+    title: string
+    subtitle: string
+    discount_text: string
+    coupon_code: string
+    bg_color: string
+    valid_until: string
+}
+
+interface Product {
+    id: string
+    name: string
+    thumbImage: string[]
+    price: number
+    originPrice: number
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
 const ModalNewsletter = () => {
-    const [open, setOpen] = useState<boolean>(false)
-    const router = useRouter()
-    const { openQuickview } = useModalQuickviewContext()
-
-    const handleDetailProduct = (productId: string) => {
-        // redirect to shop with category selected
-        router.push(`/product/default?id=${productId}`);
-    };
+    const [open, setOpen] = useState(false)
+    const [copied, setCopied] = useState(false)
+    const [timeLeft, setTimeLeft] = useState('')
+    const [promotion, setPromotion] = useState<Promotion | null>(null)
+    const [products, setProducts] = useState<Product[]>([])
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     useEffect(() => {
-        setTimeout(() => {
-            setOpen(true)
-        }, 3000)
+        // Fetch promotion and products client-side
+        fetch(`${API_BASE}/inventory/promotion`, { cache: 'no-store' })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.id) {
+                    setPromotion(data)
+                    // Show popup after 3s only if promotion is active
+                    setTimeout(() => setOpen(true), 3000)
+                }
+            })
+            .catch(() => {})
+
+        fetch(`${API_BASE}/inventory/best_seller`)
+            .then(r => r.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setProducts(data.slice(0, 5).map((p: any) => ({
+                        id: p.id.toString(),
+                        name: p.name,
+                        thumbImage: p.images?.map((img: any) => img.url) || ['/images/product/1000x1000.png'],
+                        price: p.pricing?.finalPrice || 0,
+                        originPrice: p.pricing?.actual_price || 0,
+                    })))
+                }
+            })
+            .catch(() => {})
     }, [])
+
+    useEffect(() => {
+        if (!promotion) return
+        const updateCountdown = () => {
+            const diff = new Date(promotion.valid_until).getTime() - Date.now()
+            if (diff <= 0) { setTimeLeft('Expired'); return }
+            const d = Math.floor(diff / 86400000)
+            const h = Math.floor((diff % 86400000) / 3600000)
+            const m = Math.floor((diff % 3600000) / 60000)
+            setTimeLeft(`${d}d ${h}h ${m}m left`)
+        }
+        updateCountdown()
+        intervalRef.current = setInterval(updateCountdown, 60000)
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+    }, [promotion])
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(promotion!.coupon_code)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    if (!promotion) return null
 
     return (
         <div className="modal-newsletter" onClick={() => setOpen(false)}>
             <div className="container h-full flex items-center justify-center w-full">
                 <div
                     className={`modal-newsletter-main ${open ? 'open' : ''}`}
-                    onClick={(e) => { e.stopPropagation() }}
+                    onClick={e => e.stopPropagation()}
                 >
                     <div className="main-content flex rounded-[20px] overflow-hidden w-full">
+                        {/* Left — promo panel */}
                         <div
-                            className="left lg:w-1/2 sm:w-2/5 max-sm:hidden bg-green flex flex-col items-center justify-center gap-5 py-14">
-                            <div className="text-xs font-semibold uppercase text-center">Special Offer</div>
-                            <div
-                                className="lg:text-[70px] text-4xl lg:leading-[78px] leading-[42px] font-bold uppercase text-center">
-                                Black<br />Fridays</div>
-                            <div className="text-button-uppercase text-center">New customers save <span
-                                className="text-red">30%</span>
-                                with the code</div>
-                            <div className="text-button-uppercase text-red bg-white py-2 px-4 rounded-lg">GET20off</div>
-                            <div className="button-main w-fit bg-black text-white hover:bg-white uppercase">Copy coupon code
+                            className="left lg:w-1/2 sm:w-2/5 max-sm:hidden flex flex-col items-center justify-center gap-4 py-14 px-6"
+                            style={{ backgroundColor: promotion.bg_color }}
+                        >
+                            <div className="text-xs font-semibold uppercase text-center text-white">{promotion.subtitle}</div>
+                            <div className="lg:text-[60px] text-4xl lg:leading-[66px] leading-[42px] font-bold uppercase text-center text-white">
+                                {promotion.title}
                             </div>
+                            <div className="text-sm text-center text-white">{promotion.discount_text}</div>
+                            <div className="bg-white py-2 px-4 rounded-lg font-bold tracking-widest text-black">
+                                {promotion.coupon_code}
+                            </div>
+                            <button
+                                onClick={handleCopy}
+                                style={{ padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                {copied ? 'Copied!' : 'Copy Coupon Code'}
+                            </button>
+                            {timeLeft && (
+                                <div className="text-xs text-white opacity-80">{timeLeft}</div>
+                            )}
                         </div>
+
+                        {/* Right — product list */}
                         <div className="right lg:w-1/2 sm:w-3/5 w-full bg-white sm:pt-10 sm:pl-10 max-sm:p-6 relative">
-                            <div
-                                className="close-newsletter-btn w-10 h-10 flex items-center justify-center border border-line rounded-full absolute right-5 top-5 cursor-pointer" onClick={() => setOpen(false)}>
+                            <button
+                                className="w-10 h-10 flex items-center justify-center border border-line rounded-full absolute right-5 top-5 cursor-pointer"
+                                onClick={() => setOpen(false)}
+                            >
                                 <Icon.X weight='bold' className='text-xl' />
-                            </div>
+                            </button>
                             <div className="heading5 pb-5">You May Also Like</div>
-                            <div className="list flex flex-col gap-5 overflow-x-auto sm:pr-6">
-                                {productData.slice(11, 16).map((item, index) => (
-                                    <>
-                                        <div
-                                            className='product-item item pb-5 flex items-center justify-between gap-3 border-b border-line'
-                                            key={index}
-                                        >
-                                            <div
-                                                className="infor flex items-center gap-5 cursor-pointer"
-                                                onClick={() => handleDetailProduct(item.id)}
-                                            >
-                                                <div className="bg-img flex-shrink-0">
-                                                    <Image width={5000} height={5000} src={item.thumbImage[0]} alt={item.name}
-                                                        className='w-[100px] aspect-square flex-shrink-0 rounded-lg' />
-                                                </div>
-                                                <div className=''>
-                                                    <div className="name text-button">{item.name}</div>
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <div className="product-price text-title">${item.price}.00</div>
-                                                        <div className="product-origin-price text-title text-secondary2">
-                                                            <del>${item.originPrice}.00</del>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[420px] sm:pr-6">
+                                {products.map(item => (
+                                    <Link
+                                        key={item.id}
+                                        href={`/product/default?id=${item.id}`}
+                                        className="flex items-center gap-4 pb-4 border-b border-line hover:opacity-80 duration-200"
+                                        onClick={() => setOpen(false)}
+                                    >
+                                        <Image
+                                            src={item.thumbImage[0] || '/images/product/1000x1000.png'}
+                                            width={100}
+                                            height={100}
+                                            alt={item.name}
+                                            className="w-[80px] h-[80px] object-cover rounded-lg flex-shrink-0"
+                                        />
+                                        <div>
+                                            <div className="text-button">{item.name}</div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-title">PKR {item.price.toFixed(0)}</span>
+                                                {item.originPrice > item.price && (
+                                                    <del className="text-secondary text-sm">PKR {item.originPrice.toFixed(0)}</del>
+                                                )}
                                             </div>
-                                            <button
-                                                className="quick-view-btn button-main sm:py-3 py-2 sm:px-5 px-4 bg-black hover:bg-green text-white rounded-full whitespace-nowrap"
-                                                onClick={() => openQuickview(item)}
-                                            >
-                                                QUICK VIEW
-                                            </button>
                                         </div>
-                                    </>
+                                    </Link>
                                 ))}
                             </div>
                         </div>

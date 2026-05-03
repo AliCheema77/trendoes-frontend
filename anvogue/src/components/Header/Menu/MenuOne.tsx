@@ -88,129 +88,37 @@ const MenuOne: React.FC<Props> = ({ props }) => {
                                         >
                                             Demo
                                         </Link>
-                                        <div className="sub-menu py-3 px-5 -left-10 w-max absolute grid grid-cols-4 gap-5 bg-white rounded-b-xl">
+                                        <div className="sub-menu py-3 px-5 -left-10 w-max absolute bg-white rounded-b-xl">
                                             <ul>
                                                 <li>
                                                     <Link href="/" className={`link text-secondary duration-300 ${pathname === '/' ? 'active' : ''}`}>
                                                         Home Fashion 1
                                                     </Link>
                                                 </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion2" className='link text-secondary duration-300'>
-                                                        Home Fashion 2
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion3" className='link text-secondary duration-300'>
-                                                        Home Fashion 3
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion4" className='link text-secondary duration-300'>
-                                                        Home Fashion 4
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion5" className='link text-secondary duration-300'>
-                                                        Home Fashion 5
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion6" className='link text-secondary duration-300'>
-                                                        Home Fashion 6
-                                                    </Link>
-                                                </li>
-                                            </ul>
-                                            <ul>
-                                                <li>
-                                                    <Link href="/homepages/fashion7" className='link text-secondary duration-300'>
-                                                        Home Fashion 7
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion8" className='link text-secondary duration-300'>
-                                                        Home Fashion 8
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion9" className='link text-secondary duration-300'>
-                                                        Home Fashion 9
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion10" className='link text-secondary duration-300'>
-                                                        Home Fashion 10
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/fashion11" className='link text-secondary duration-300'>
-                                                        Home Fashion 11
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/underwear" className='link text-secondary duration-300'>
-                                                        Home Underwear
-                                                    </Link>
-                                                </li>
-                                            </ul>
-                                            <ul>
-                                                <li>
-                                                    <Link href="/homepages/cosmetic1" className='link text-secondary duration-300'>
-                                                        Home Cosmetic 1
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/cosmetic2" className='link text-secondary duration-300'>
-                                                        Home Cosmetic 2
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/cosmetic3" className='link text-secondary duration-300'>
-                                                        Home Cosmetic 3
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/pet" className='link text-secondary duration-300'>
-                                                        Home Pet Store
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/jewelry" className='link text-secondary duration-300'>
-                                                        Home Jewelry
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/furniture" className='link text-secondary duration-300'>
-                                                        Home Furniture
-                                                    </Link>
-                                                </li>
-                                            </ul>
-                                            <ul>
-                                                <li>
-                                                    <Link href="/homepages/watch" className='link text-secondary duration-300'>
-                                                        Home Watch
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/toys" className='link text-secondary duration-300'>
-                                                        Home Toys Kid
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/yoga" className='link text-secondary duration-300'>
-                                                        Home Yoga
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/organic" className='link text-secondary duration-300'>
-                                                        Home Organic
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link href="/homepages/marketplace" className='text-secondary duration-300'>
-                                                        Home Marketplace
-                                                    </Link>
-                                                </li>
+                                                {/* Other demo pages hidden until needed
+                                                <li><Link href="/homepages/fashion2">Home Fashion 2</Link></li>
+                                                <li><Link href="/homepages/fashion3">Home Fashion 3</Link></li>
+                                                <li><Link href="/homepages/fashion4">Home Fashion 4</Link></li>
+                                                <li><Link href="/homepages/fashion5">Home Fashion 5</Link></li>
+                                                <li><Link href="/homepages/fashion6">Home Fashion 6</Link></li>
+                                                <li><Link href="/homepages/fashion7">Home Fashion 7</Link></li>
+                                                <li><Link href="/homepages/fashion8">Home Fashion 8</Link></li>
+                                                <li><Link href="/homepages/fashion9">Home Fashion 9</Link></li>
+                                                <li><Link href="/homepages/fashion10">Home Fashion 10</Link></li>
+                                                <li><Link href="/homepages/fashion11">Home Fashion 11</Link></li>
+                                                <li><Link href="/homepages/underwear">Home Underwear</Link></li>
+                                                <li><Link href="/homepages/cosmetic1">Home Cosmetic 1</Link></li>
+                                                <li><Link href="/homepages/cosmetic2">Home Cosmetic 2</Link></li>
+                                                <li><Link href="/homepages/cosmetic3">Home Cosmetic 3</Link></li>
+                                                <li><Link href="/homepages/pet">Home Pet Store</Link></li>
+                                                <li><Link href="/homepages/jewelry">Home Jewelry</Link></li>
+                                                <li><Link href="/homepages/furniture">Home Furniture</Link></li>
+                                                <li><Link href="/homepages/watch">Home Watch</Link></li>
+                                                <li><Link href="/homepages/toys">Home Toys Kid</Link></li>
+                                                <li><Link href="/homepages/yoga">Home Yoga</Link></li>
+                                                <li><Link href="/homepages/organic">Home Organic</Link></li>
+                                                <li><Link href="/homepages/marketplace">Home Marketplace</Link></li>
+                                                */}
                                             </ul>
                                         </div>
                                     </li>

@@ -11,7 +11,7 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.0.14",
     "framer-motion": "^10.17.4",
-    "next": "14.0.3",
+    "next": "^14.2.35",
     "nprogress": "^0.2.0",
     "rc-slider": "^10.5.0",
     "react": "^18",
@@ -23,7 +23,7 @@
     "react-slider": "^2.0.6",
     "sass": "^1.69.5",
     "slick-carousel": "^1.8.1",
-    "swiper": "^11.0.4"
+    "swiper": "^12.1.2"
   },
   "devDependencies": {
     "@types/node": "^20",

@@ -33,7 +33,9 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [openSizeGuide, setOpenSizeGuide] = useState<boolean>(false)
     const [thumbsSwiper, setThumbsSwiper] = useState<SwiperCore | null>(null);
     const [activeColor, setActiveColor] = useState<string>('')
+    const [activeColorId, setActiveColorId] = useState<number | undefined>(undefined)
     const [activeSize, setActiveSize] = useState<string>('')
+    const [activeSizeId, setActiveSizeId] = useState<number | undefined>(undefined)
     const [activeTab, setActiveTab] = useState<string | undefined>('description')
     const { addToCart, updateCart, cartState } = useCart()
     const { openModalCart } = useModalCartContext()
@@ -61,44 +63,41 @@ const Default: React.FC<Props> = ({ data, productId }) => {
         setThumbsSwiper(swiper);
     };
 
-    const handleActiveColor = (item: string) => {
-        setActiveColor(item)
-
-        // // Find variation with selected color
-        // const foundColor = productMain.variation.find((variation) => variation.color === item);
-        // // If found, slide next to img
-        // if (foundColor) {
-        //     const index = productMain.images.indexOf(foundColor.image);
-
-        //     if (index !== -1) {
-        //         swiperRef.current?.slideTo(index);
-        //     }
-        // }
+    const handleActiveColor = (colorName: string) => {
+        setActiveColor(colorName)
+        if (productMain.stocksRaw) {
+            for (const stock of productMain.stocksRaw) {
+                const match = stock.colors.find(c => c.color.name === colorName)
+                if (match) { setActiveColorId(match.color.id); break }
+            }
+        }
     }
 
-    const handleActiveSize = (item: string) => {
-        setActiveSize(item)
+    const handleActiveSize = (sizeName: string) => {
+        setActiveSize(sizeName)
+        if (productMain.stocksRaw) {
+            const stock = productMain.stocksRaw.find(s => s.size.name === sizeName)
+            if (stock) setActiveSizeId(stock.size.id)
+        }
     }
 
     const handleIncreaseQuantity = () => {
         productMain.quantityPurchase += 1
-        updateCart(productMain.id, productMain.quantityPurchase + 1, activeSize, activeColor);
+        updateCart(productMain.id, productMain.quantityPurchase + 1, activeSize, activeColor, activeSizeId, activeColorId);
     };
 
     const handleDecreaseQuantity = () => {
         if (productMain.quantityPurchase > 1) {
             productMain.quantityPurchase -= 1
-            updateCart(productMain.id, productMain.quantityPurchase - 1, activeSize, activeColor);
+            updateCart(productMain.id, productMain.quantityPurchase - 1, activeSize, activeColor, activeSizeId, activeColorId);
         }
     };
 
     const handleAddToCart = () => {
         if (!cartState.cartArray.find(item => item.id === productMain.id)) {
             addToCart({ ...productMain });
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
-        } else {
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
         }
+        updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor, activeSizeId, activeColorId)
         openModalCart()
     };
 
@@ -258,9 +257,9 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                 <span className='caption1 text-secondary'>(1.234 reviews)</span>
                             </div>
                             <div className="flex items-center gap-3 flex-wrap mt-5 pb-6 border-b border-line">
-                                <div className="product-price heading5">${productMain.price}.00</div>
+                                <div className="product-price heading5">PKR {productMain.price.toFixed(0)}</div>
                                 <div className='w-px h-4 bg-line'></div>
-                                <div className="product-origin-price font-normal text-secondary2"><del>${productMain.originPrice}.00</del></div>
+                                <div className="product-origin-price font-normal text-secondary2"><del>PKR {productMain.originPrice.toFixed(0)}</del></div>
                                 {productMain.originPrice && (
                                     <div className="product-sale caption2 font-semibold bg-green px-3 py-0.5 inline-block rounded-full">
                                         -{percentSale}%

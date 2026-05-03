@@ -1,31 +1,41 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link'
 import TopNavOne from '@/components/Header/TopNav/TopNavOne'
 import MenuOne from '@/components/Header/Menu/MenuOne'
 import BreadcrumbProduct from '@/components/Breadcrumb/BreadcrumbProduct'
 import Default from '@/components/Product/Detail/Default';
 import Footer from '@/components/Footer/Footer'
 import { ProductType } from '@/type/ProductType'
-import productData from '@/data/Product.json'
+import productFallback from '@/data/Product.json'
+import { fetchProductById } from '@/lib/api'
+import { mapApiProduct } from '@/lib/mappers'
 
 const ProductDefault = () => {
     const searchParams = useSearchParams()
-    let productId = searchParams.get('id')
+    const productId = searchParams.get('id') ?? '1'
+    const [allProducts, setAllProducts] = useState<ProductType[]>(productFallback as any[])
 
-    if (productId === null) {
-        productId = '1'
-    }
+    useEffect(() => {
+        fetchProductById(productId)
+            .then(data => {
+                const mapped = mapApiProduct(data)
+                setAllProducts(prev => {
+                    const withoutCurrent = prev.filter(p => p.id !== mapped.id)
+                    return [mapped, ...withoutCurrent]
+                })
+            })
+            .catch(() => { /* use fallback */ })
+    }, [productId])
 
     return (
         <>
             <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
             <div id="header" className='relative w-full'>
                 <MenuOne props="bg-white" />
-                <BreadcrumbProduct data={productData} productPage='default' productId={productId} />
+                <BreadcrumbProduct data={allProducts} productPage='default' productId={productId} />
             </div>
-            <Default data={productData} productId={productId} />
+            <Default data={allProducts} productId={productId} />
             <Footer />
         </>
     )

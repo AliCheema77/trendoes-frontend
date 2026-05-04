@@ -50,6 +50,19 @@ const WishlistReducer = (state: WishlistState, action: WishlistAction): Wishlist
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [wishlistState, dispatch] = useReducer(WishlistReducer, { wishlistArray: [] });
 
+    // Load from localStorage on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('wishlist')
+            if (saved) dispatch({ type: 'LOAD_WISHLIST', payload: JSON.parse(saved) })
+        } catch {}
+    }, []);
+
+    // Save to localStorage whenever wishlist changes
+    useEffect(() => {
+        localStorage.setItem('wishlist', JSON.stringify(wishlistState.wishlistArray))
+    }, [wishlistState.wishlistArray]);
+
     const addToWishlist = (item: ProductType) => {
         dispatch({ type: 'ADD_TO_WISHLIST', payload: item });
     };

@@ -38,7 +38,7 @@ interface Order {
     total: string
     status: string
     created_at: string
-    items: OrderItem[]
+    order_items: OrderItem[]
 }
 
 const MyAccount = () => {
@@ -190,8 +190,8 @@ const MyAccount = () => {
                                                         </th>
                                                         <td className="py-3">
                                                             <div className="info flex flex-col">
-                                                                <strong className="product_name text-button">{order.items[0]?.product_name || '—'}</strong>
-                                                                {order.items.length > 1 && <span className="caption1 text-secondary">+{order.items.length - 1} more</span>}
+                                                                <strong className="product_name text-button">{order.order_items?.[0]?.product_name || '—'}</strong>
+                                                                {(order.order_items?.length ?? 0) > 1 && <span className="caption1 text-secondary">+{(order.order_items?.length ?? 0) - 1} more</span>}
                                                             </div>
                                                         </td>
                                                         <td className="py-3">PKR {parseFloat(order.total).toFixed(0)}</td>
@@ -246,7 +246,7 @@ const MyAccount = () => {
                                                     </div>
                                                 </div>
                                                 <div className="list_prd px-5">
-                                                    {order.items.map(item => (
+                                                    {(order.order_items ?? []).map(item => (
                                                         <div key={item.id} className="prd_item flex flex-wrap items-center justify-between gap-3 py-5 border-b border-line">
                                                             <div className="flex items-center gap-3">
                                                                 <div>

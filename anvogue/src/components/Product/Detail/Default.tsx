@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ProductType } from '@/type/ProductType'
@@ -50,6 +50,62 @@ const Default: React.FC<Props> = ({ data, productId }) => {
 
     const percentSale = Math.floor(100 - ((productMain?.price / productMain?.originPrice) * 100))
 
+    // Reset selections whenever the viewed product changes
+    useEffect(() => {
+        setActiveColor('')
+        setActiveColorId(undefined)
+        setActiveSize('')
+        setActiveSizeId(undefined)
+    }, [productId])
+
+    // Derive colors and sizes from API stock data
+    const useApiData = productMain.stocksRaw !== undefined
+    const allColors: Array<{ id: number; name: string; HEX: string; totalQty: number }> = []
+    const allSizes: Array<{ id: number; name: string; totalQty: number }> = []
+
+    if (useApiData) {
+        const colorMap = new Map<number, { id: number; name: string; HEX: string; totalQty: number }>()
+        for (const stock of productMain.stocksRaw!) {
+            for (const c of stock.colors) {
+                if (!colorMap.has(c.color.id)) colorMap.set(c.color.id, { ...c.color, totalQty: 0 })
+                colorMap.get(c.color.id)!.totalQty += c.quantity
+            }
+        }
+        allColors.push(...Array.from(colorMap.values()))
+        for (const stock of productMain.stocksRaw!) {
+            const sizeQty = stock.colors.reduce((sum, c) => sum + c.quantity, 0)
+            allSizes.push({ ...stock.size, totalQty: sizeQty })
+        }
+    }
+
+    // Which colors are in stock for the currently selected size
+    const colorsAvailableForActiveSize = new Set<number>()
+    if (useApiData && activeSizeId) {
+        const sizeEntry = productMain.stocksRaw!.find(s => s.size.id === activeSizeId)
+        if (sizeEntry) {
+            for (const c of sizeEntry.colors) {
+                if (c.quantity > 0) colorsAvailableForActiveSize.add(c.color.id)
+            }
+        }
+    }
+
+    // Which sizes are in stock for the currently selected color
+    const sizesAvailableForActiveColor = new Set<number>()
+    if (useApiData && activeColorId) {
+        for (const stock of productMain.stocksRaw!) {
+            const match = stock.colors.find(c => c.color.id === activeColorId && c.quantity > 0)
+            if (match) sizesAvailableForActiveColor.add(stock.size.id)
+        }
+    }
+
+    // Is the selected combination sold out?
+    const isCombinationSoldOut: boolean = (() => {
+        if (!activeSizeId || !activeColorId || !useApiData) return false
+        const sizeEntry = productMain.stocksRaw!.find(s => s.size.id === activeSizeId)
+        const colorEntry = sizeEntry?.colors.find(c => c.color.id === activeColorId)
+        return colorEntry !== undefined && colorEntry.quantity === 0
+    })()
+
     const handleOpenSizeGuide = () => {
         setOpenSizeGuide(true);
     };
@@ -65,20 +121,14 @@ const Default: React.FC<Props> = ({ data, productId }) => {
 
     const handleActiveColor = (colorName: string) => {
         setActiveColor(colorName)
-        if (productMain.stocksRaw) {
-            for (const stock of productMain.stocksRaw) {
-                const match = stock.colors.find(c => c.color.name === colorName)
-                if (match) { setActiveColorId(match.color.id); break }
-            }
-        }
+        const colorData = allColors.find(c => c.name === colorName)
+        if (colorData) setActiveColorId(colorData.id)
     }
 
     const handleActiveSize = (sizeName: string) => {
         setActiveSize(sizeName)
-        if (productMain.stocksRaw) {
-            const stock = productMain.stocksRaw.find(s => s.size.name === sizeName)
-            if (stock) setActiveSizeId(stock.size.id)
-        }
+        const sizeData = allSizes.find(s => s.name === sizeName)
+        if (sizeData) setActiveSizeId(sizeData.id)
     }
 
     const handleIncreaseQuantity = () => {
@@ -93,7 +143,22 @@ const Default: React.FC<Props> = ({ data, productId }) => {
         }
     };
 
+    const [cartError, setCartError] = useState<string>('')
+
     const handleAddToCart = () => {
+        if (useApiData && allColors.length > 0 && !activeColor) {
+            setCartError('Please select a color')
+            return
+        }
+        if (useApiData && allSizes.length > 0 && !activeSize) {
+            setCartError('Please select a size')
+            return
+        }
+        if (isCombinationSoldOut) {
+            setCartError('This combination is sold out')
+            return
+        }
+        setCartError('')
         if (!cartState.cartArray.find(item => item.id === productMain.id)) {
             addToCart({ ...productMain });
         }
@@ -271,27 +336,53 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                 <div className="choose-color">
                                     <div className="text-title">Colors: <span className='text-title color'>{activeColor}</span></div>
                                     <div className="list-color flex items-center gap-2 flex-wrap mt-3">
-                                        {productMain.variation.map((item, index) => (
-                                            <div
-                                                className={`color-item w-12 h-12 rounded-xl duration-300 relative ${activeColor === item.color ? 'active' : ''}`}
-                                                key={index}
-                                                datatype={item.image}
-                                                onClick={() => {
-                                                    handleActiveColor(item.color)
-                                                }}
-                                            >
-                                                <Image
-                                                    src={item.colorImage}
-                                                    width={100}
-                                                    height={100}
-                                                    alt='color'
-                                                    className='rounded-xl'
-                                                />
-                                                <div className="tag-action bg-black text-white caption2 capitalize px-1.5 py-0.5 rounded-sm">
-                                                    {item.color}
+                                        {useApiData ? (
+                                            allColors.length === 0 ? (
+                                                <span className="caption1 text-secondary">No colors available</span>
+                                            ) : (
+                                                allColors.map((color) => {
+                                                    const unavailable = (activeSizeId !== undefined && colorsAvailableForActiveSize.size > 0)
+                                                        ? !colorsAvailableForActiveSize.has(color.id)
+                                                        : color.totalQty === 0
+                                                    return (
+                                                        <div
+                                                            key={color.id}
+                                                            className={`color-item w-12 h-12 rounded-xl duration-300 relative ${activeColor === color.name ? 'active' : ''} ${unavailable ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            onClick={() => { if (!unavailable) handleActiveColor(color.name) }}
+                                                        >
+                                                            <div
+                                                                className="w-full h-full rounded-xl border border-line"
+                                                                style={{ backgroundColor: color.HEX }}
+                                                            />
+                                                            {unavailable && (
+                                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                                    <div className="w-full h-px bg-gray-400 rotate-45 absolute" />
+                                                                </div>
+                                                            )}
+                                                            <div className="tag-action bg-black text-white caption2 capitalize px-1.5 py-0.5 rounded-sm">
+                                                                {unavailable ? `${color.name} (sold out)` : color.name}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
+                                            )
+                                        ) : (
+                                            productMain.variation.map((item, index) => (
+                                                <div
+                                                    className={`color-item w-12 h-12 rounded-xl duration-300 relative cursor-pointer ${activeColor === item.color ? 'active' : ''}`}
+                                                    key={index}
+                                                    onClick={() => handleActiveColor(item.color)}
+                                                >
+                                                    <div
+                                                        className="w-full h-full rounded-xl border border-line"
+                                                        style={{ backgroundColor: item.colorCode || '#000000' }}
+                                                    />
+                                                    <div className="tag-action bg-black text-white caption2 capitalize px-1.5 py-0.5 rounded-sm">
+                                                        {item.color}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                                 <div className="choose-size mt-5">
@@ -306,16 +397,40 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                         <ModalSizeguide data={productMain} isOpen={openSizeGuide} onClose={handleCloseSizeGuide} />
                                     </div>
                                     <div className="list-size flex items-center gap-2 flex-wrap mt-3">
-                                        {productMain.sizes.map((item, index) => (
-                                            <div
-                                                className={`size-item ${item === 'freesize' ? 'px-3 py-2' : 'w-12 h-12'} flex items-center justify-center text-button rounded-full bg-white border border-line ${activeSize === item ? 'active' : ''}`}
-                                                key={index}
-                                                onClick={() => handleActiveSize(item)}
-                                            >
-                                                {item}
-                                            </div>
-                                        ))}
+                                        {useApiData ? (
+                                            allSizes.length === 0 ? (
+                                                <span className="caption1 text-secondary">No sizes available</span>
+                                            ) : (
+                                                allSizes.map((size) => {
+                                                    const unavailable = (activeColorId !== undefined && sizesAvailableForActiveColor.size > 0)
+                                                        ? !sizesAvailableForActiveColor.has(size.id)
+                                                        : size.totalQty === 0
+                                                    return (
+                                                        <div
+                                                            key={size.id}
+                                                            className={`size-item ${size.name === 'freesize' ? 'px-3 py-2' : 'w-12 h-12'} flex items-center justify-center text-button rounded-full bg-white border ${activeSize === size.name ? 'active' : 'border-line'} ${unavailable ? 'opacity-40 line-through cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            onClick={() => { if (!unavailable) handleActiveSize(size.name) }}
+                                                        >
+                                                            {size.name}
+                                                        </div>
+                                                    )
+                                                })
+                                            )
+                                        ) : (
+                                            productMain.sizes.map((item, index) => (
+                                                <div
+                                                    className={`size-item ${item === 'freesize' ? 'px-3 py-2' : 'w-12 h-12'} flex items-center justify-center text-button rounded-full bg-white border border-line cursor-pointer ${activeSize === item ? 'active' : ''}`}
+                                                    key={index}
+                                                    onClick={() => handleActiveSize(item)}
+                                                >
+                                                    {item}
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
+                                    {isCombinationSoldOut && (
+                                        <div className="mt-2 caption1 font-semibold text-red-500">Sold Out</div>
+                                    )}
                                 </div>
                                 <div className="text-title mt-5">Quantity:</div>
                                 <div className="choose-quantity flex items-center lg:justify-between gap-5 gap-y-3 mt-3">
@@ -334,6 +449,9 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     </div>
                                     <div onClick={handleAddToCart} className="button-main w-full text-center bg-white text-black border border-black">Add To Cart</div>
                                 </div>
+                                {cartError && (
+                                    <div className="mt-2 caption1 text-red-500">{cartError}</div>
+                                )}
                                 <div className="button-block mt-5">
                                     <div className="button-main w-full text-center">Buy It Now</div>
                                 </div>
@@ -1008,7 +1126,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                     <div className="container">
                         <div className="heading3 text-center">Related Products</div>
                         <div className="list-product hide-product-sold  grid lg:grid-cols-4 grid-cols-2 md:gap-[30px] gap-5 md:mt-10 mt-6">
-                            {data.slice(Number(productId), Number(productId) + 4).map((item, index) => (
+                            {data.filter(item => item.id !== productId).slice(0, 4).map((item, index) => (
                                 <Product key={index} data={item} type='grid' style='style-1' />
                             ))}
                         </div>

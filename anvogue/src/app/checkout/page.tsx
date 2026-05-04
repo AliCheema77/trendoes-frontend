@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -33,7 +33,7 @@ const Checkout = () => {
     const router = useRouter()
 
     const { cartState, removeFromCart } = useCart()
-    const { accessToken } = useAuth()
+    const { user, accessToken } = useAuth()
 
     const subtotal = cartState.cartArray.reduce((sum, item) => sum + item.price * item.quantity, 0)
     const total = subtotal - discount + ship
@@ -42,6 +42,12 @@ const Checkout = () => {
     const [activePayment, setActivePayment] = useState('COD')
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (user?.email) {
+            setForm(prev => ({ ...prev, email: user.email }))
+        }
+    }, [user])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setForm(prev => ({ ...prev, [e.target.id]: e.target.value }))
@@ -114,12 +120,21 @@ const Checkout = () => {
                 <div className="container">
                     <div className="content-main flex justify-between">
                         <div className="left w-1/2">
-                            <div className="login bg-surface py-3 px-4 flex justify-between rounded-lg">
-                                <div className="left flex items-center">
-                                    <span className="text-on-surface-variant1 pr-4">Already have an account? </span>
-                                    <Link href="/login" className="text-button text-on-surface hover-underline">Login</Link>
+                            {!user && (
+                                <div className="login bg-surface py-3 px-4 flex justify-between rounded-lg">
+                                    <div className="left flex items-center">
+                                        <span className="text-on-surface-variant1 pr-4">Already have an account? </span>
+                                        <Link href="/login" className="text-button text-on-surface hover-underline">Login</Link>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+                            {user && (
+                                <div className="login bg-surface py-3 px-4 rounded-lg">
+                                    <span className="text-on-surface-variant1">Checking out as </span>
+                                    <span className="text-button">{user.username}</span>
+                                    <span className="text-on-surface-variant1"> ({user.email})</span>
+                                </div>
+                            )}
                             <div className="information mt-5">
                                 <div className="heading5">Information</div>
                                 <form className="form-checkout mt-5" onSubmit={handleSubmit}>

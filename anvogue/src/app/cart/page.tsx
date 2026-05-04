@@ -23,7 +23,7 @@ const Cart = () => {
         return () => clearInterval(timer);
     }, []);
 
-    const { cartState, updateCart, removeFromCart } = useCart();
+    const { cartState, updateCart, removeFromCart, clearCart } = useCart();
 
     const handleQuantityChange = (productId: string, newQuantity: number) => {
         // Tìm sản phẩm trong giỏ hàng
@@ -103,6 +103,17 @@ const Cart = () => {
                             </div>
                             <div className="list-product w-full sm:mt-7 mt-5">
                                 <div className='w-full'>
+                                    {cartState.cartArray.length > 0 && (
+                                        <div className="flex justify-end mb-3">
+                                            <button
+                                                className="flex items-center gap-2 text-red text-button hover:underline"
+                                                onClick={clearCart}
+                                            >
+                                                <Icon.Trash size={16} />
+                                                Clear Cart
+                                            </button>
+                                        </div>
+                                    )}
                                     <div className="heading bg-surface bora-4 pt-4 pb-4">
                                         <div className="flex">
                                             <div className="w-1/2">

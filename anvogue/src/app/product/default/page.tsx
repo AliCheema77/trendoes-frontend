@@ -8,8 +8,9 @@ import Default from '@/components/Product/Detail/Default';
 import Footer from '@/components/Footer/Footer'
 import { ProductType } from '@/type/ProductType'
 import productFallback from '@/data/Product.json'
-import { fetchProductById } from '@/lib/api'
-import { mapApiProduct } from '@/lib/mappers'
+import { fetchProductById, fetchProducts } from '@/lib/api'
+import { mapApiProduct, mapApiProducts } from '@/lib/mappers'
+import { addRecentlyViewed } from '@/lib/recentlyViewed'
 
 const ProductDefault = () => {
     const searchParams = useSearchParams()
@@ -18,12 +19,18 @@ const ProductDefault = () => {
 
     useEffect(() => {
         fetchProductById(productId)
-            .then(data => {
+            .then(async data => {
                 const mapped = mapApiProduct(data)
-                setAllProducts(prev => {
-                    const withoutCurrent = prev.filter(p => p.id !== mapped.id)
-                    return [mapped, ...withoutCurrent]
-                })
+                addRecentlyViewed(mapped.id)
+                try {
+                    const res = await fetchProducts({ subcategory: mapped.type, page_size: '5' })
+                    const related = mapApiProducts(res.results ?? res)
+                        .filter(p => p.id !== mapped.id)
+                        .slice(0, 4)
+                    setAllProducts([mapped, ...related])
+                } catch {
+                    setAllProducts([mapped])
+                }
             })
             .catch(() => { /* use fallback */ })
     }, [productId])

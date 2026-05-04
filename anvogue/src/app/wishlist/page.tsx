@@ -42,6 +42,7 @@ const Wishlist = () => {
         return isTypeMatched
     })
 
+    const availableTypes = [...new Set(wishlistState.wishlistArray.map(p => p.type).filter(Boolean))]
     const totalProducts = filteredData.length
     const selectedType = type
 
@@ -174,7 +175,7 @@ const Wishlist = () => {
                                         value={type === undefined ? 'Type' : type}
                                     >
                                         <option value="Type" disabled>Type</option>
-                                        {['t-shirt', 'dress', 'top', 'swimwear', 'shirt', 'underwear', 'sets', 'accessories'].map((item, index) => (
+                                        {availableTypes.map((item, index) => (
                                             <option
                                                 key={index}
                                                 className={`item cursor-pointer ${type === item ? 'active' : ''}`}
@@ -240,7 +241,7 @@ const Wishlist = () => {
                                 item.id === 'no-data' ? (
                                     <div key={item.id} className="no-data-product">No products match the selected criteria.</div>
                                 ) : (
-                                    <Product key={item.id} data={item} type='grid' />
+                                    <Product key={item.id} data={item} type='grid' style='style-1' />
                                 )
                             ))}
                         </div>

@@ -60,8 +60,7 @@ const FeaturedProduct: React.FC<Props> = ({ data }) => {
         openModalCart()
     };
 
-    // Truy cập thông tin của sản phẩm thứ 38 trong mảng data
-    const productMain = data[120];
+    const productMain = data.find(p => p.isFeatured) ?? data[0];
     const percentSale = Math.floor(100 - ((productMain.price / productMain.originPrice) * 100))
 
     return (

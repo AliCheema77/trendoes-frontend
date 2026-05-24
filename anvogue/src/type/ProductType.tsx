@@ -23,6 +23,7 @@ export interface ProductType {
     gender: string,
     new: boolean,
     sale: boolean,
+    isFeatured: boolean,
     rate: number,
     price: number,
     originPrice: number,

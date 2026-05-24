@@ -39,6 +39,41 @@ export async function fetchActivePromotion() {
   return apiFetch('/inventory/promotion')
 }
 
+export async function fetchBanners() {
+  return apiFetch('/inventory/banners')
+}
+
+export async function fetchBenefits() {
+  return apiFetch('/inventory/benefits')
+}
+
+export async function fetchBrandCarousel() {
+  return apiFetch('/inventory/brand-carousel')
+}
+
+export async function fetchInstagramSettings() {
+  return apiFetch('/inventory/instagram-settings')
+}
+
+export async function fetchBlogPosts(params?: Record<string, string>) {
+  const query = params && Object.keys(params).length > 0
+    ? '?' + new URLSearchParams(params).toString()
+    : ''
+  return apiFetch(`/blog/posts${query}`)
+}
+
+export async function fetchBlogPost(id: string | number) {
+  return apiFetch(`/blog/posts/${id}`)
+}
+
+export async function fetchBlogCategories() {
+  return apiFetch('/blog/categories')
+}
+
+export async function fetchInstagramPosts() {
+  return apiFetch('/inventory/instagram-posts')
+}
+
 // Auth
 export async function loginUser(email: string, password: string) {
   return apiFetch('/users/login', {

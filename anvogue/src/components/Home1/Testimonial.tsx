@@ -13,6 +13,8 @@ interface Props {
 }
 
 const Testimonial: React.FC<Props> = ({ data, limit }) => {
+    if (!data || data.length === 0) return null
+
     return (
         <>
             <div className="testimonial-block md:py-20 py-10 bg-surface">

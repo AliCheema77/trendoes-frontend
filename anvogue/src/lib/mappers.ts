@@ -85,6 +85,7 @@ export function mapApiProduct(p: ApiProduct): ProductType {
     gender: p.gender?.name || '',
     new: isNew,
     sale: p.pricing.discountPercent > 0,
+    isFeatured: p.is_featured ?? false,
     rate: p.ratingValue,
     price: p.pricing.finalPrice,
     originPrice: p.pricing.actual_price,

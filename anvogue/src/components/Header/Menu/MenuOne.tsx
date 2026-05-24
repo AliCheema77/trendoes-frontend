@@ -13,6 +13,46 @@ import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
+// ---------- Types ----------
+interface SubCategoryItem {
+    id: number
+    name: string
+    category_name: string
+}
+interface CategoryGroup {
+    name: string
+    subcategories: SubCategoryItem[]
+}
+
+// ---------- Static fallback (shown instantly, replaced when API responds) ----------
+const STATIC_GROUPS: CategoryGroup[] = [
+    {
+        name: 'Men',
+        subcategories: [
+            { id: 0, name: 'Outerwear | Coats', category_name: 'Men' },
+            { id: 1, name: 'Sweaters | Cardigans', category_name: 'Men' },
+            { id: 2, name: 'Shirt | Sweatshirts', category_name: 'Men' },
+        ],
+    },
+    {
+        name: 'Women',
+        subcategories: [
+            { id: 3, name: 'Dresses | Jumpsuits', category_name: 'Women' },
+            { id: 4, name: 'T-shirts | Sweatshirts', category_name: 'Women' },
+            { id: 5, name: 'Accessories | Jewelry', category_name: 'Women' },
+        ],
+    },
+    {
+        name: 'Kids',
+        subcategories: [
+            { id: 6, name: "Boy's Toy", category_name: 'Kids' },
+            { id: 7, name: 'Baby Blanket', category_name: 'Kids' },
+            { id: 8, name: 'Newborn Clothing', category_name: 'Kids' },
+        ],
+    },
+]
+
+// ---------- Props ----------
 interface Props {
     props: string;
 }
@@ -29,12 +69,56 @@ const MenuOne: React.FC<Props> = ({ props }) => {
     const { openModalWishlist } = useModalWishlistContext()
     const { openModalSearch } = useModalSearchContext()
 
-    const handleOpenSubNavMobile = (index: number) => {
-        setOpenSubNavMobile(openSubNavMobile === index ? null : index)
-    }
-
     const [fixedHeader, setFixedHeader] = useState(false)
-    const [lastScrollPosition, setLastScrollPosition] = useState(0);
+    const [lastScrollPosition, setLastScrollPosition] = useState(0)
+
+    // Start with static fallback so nav is visible immediately on page load.
+    // The useEffect below overwrites this with live data from the API.
+    const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>(STATIC_GROUPS)
+
+    useEffect(() => {
+        const CACHE_KEY = 'trendoes_subcategories'
+        const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+
+        const applyData = (data: SubCategoryItem[]) => {
+            if (!Array.isArray(data) || data.length === 0) return
+            const map: Record<string, SubCategoryItem[]> = {}
+            for (const sc of data) {
+                const cat = sc.category_name || 'Other'
+                if (!map[cat]) map[cat] = []
+                map[cat].push(sc)
+            }
+            setCategoryGroups(
+                Object.entries(map).map(([name, subcategories]) => ({ name, subcategories }))
+            )
+        }
+
+        try {
+            const cached = localStorage.getItem(CACHE_KEY)
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached)
+                if (Date.now() - timestamp < CACHE_TTL) {
+                    applyData(data)
+                    return
+                }
+            }
+        } catch {
+            // localStorage unavailable — proceed to fetch
+        }
+
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+        fetch(`${API_BASE}/inventory/subcategories`)
+            .then(r => r.json())
+            .then((data: SubCategoryItem[]) => {
+                applyData(data)
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
+                } catch { }
+            })
+            .catch(() => {
+                // API unreachable — STATIC_GROUPS remain in state, nav still works
+            })
+    }, [])
 
     useEffect(() => {
         const handleScroll = () => {
@@ -42,21 +126,16 @@ const MenuOne: React.FC<Props> = ({ props }) => {
             setFixedHeader(scrollPosition > 0 && scrollPosition < lastScrollPosition);
             setLastScrollPosition(scrollPosition);
         };
-
         window.addEventListener('scroll', handleScroll);
-
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-        };
+        return () => window.removeEventListener('scroll', handleScroll);
     }, [lastScrollPosition]);
 
-    const handleGenderClick = (gender: string) => {
-        router.push(`/shop/breadcrumb1?gender=${gender}`);
-    };
+    const handleOpenSubNavMobile = (index: number) => {
+        setOpenSubNavMobile(openSubNavMobile === index ? null : index)
+    }
 
-    const handleGenderTypeClick = (gender: string, type: string) => {
-        router.push(`/shop/breadcrumb1?gender=${gender}&type=${type}`);
-    };
+    const genderParam = (name: string) => name.toLowerCase()
+    const typeParam = (name: string) => name.toLowerCase()
 
     return (
         <>
@@ -70,104 +149,41 @@ const MenuOne: React.FC<Props> = ({ props }) => {
                             <Link href={'/'} className='flex items-center max-lg:absolute max-lg:left-1/2 max-lg:-translate-x-1/2'>
                                 <div className="heading4">Anvogue</div>
                             </Link>
+                            {/* Desktop nav — rendered from live API data */}
                             <div className="menu-main h-full max-lg:hidden">
                                 <ul className='flex items-center gap-8 h-full'>
-                                    <li className='h-full relative'>
-                                        <Link
-                                            href="/shop/breadcrumb1?gender=men"
-                                            className={`text-button-uppercase duration-300 h-full flex items-center justify-center gap-1 ${pathname.includes('gender=men') ? 'active' : ''}`}
-                                        >
-                                            Men
-                                        </Link>
-                                        <div className="sub-menu py-3 px-5 -left-10 w-max absolute bg-white rounded-b-xl">
-                                            <ul>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('men', 'outerwear')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Outerwear | Coats
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('men', 'sweater')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Sweaters | Cardigans
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('men', 'shirt')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Shirt | Sweatshirts
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderClick('men')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                        View All
-                                                    </div>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </li>
-                                    <li className='h-full relative'>
-                                        <Link
-                                            href="/shop/breadcrumb1?gender=women"
-                                            className={`text-button-uppercase duration-300 h-full flex items-center justify-center gap-1 ${pathname.includes('gender=women') ? 'active' : ''}`}
-                                        >
-                                            Women
-                                        </Link>
-                                        <div className="sub-menu py-3 px-5 -left-10 w-max absolute bg-white rounded-b-xl">
-                                            <ul>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('women', 'dress')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Dresses | Jumpsuits
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('women', 't-shirt')} className="link text-secondary duration-300 cursor-pointer">
-                                                        T-shirts | Sweatshirts
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('women', 'accessories')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Accessories | Jewelry
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderClick('women')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                        View All
-                                                    </div>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </li>
-                                    <li className='h-full relative'>
-                                        <Link
-                                            href="/shop/breadcrumb1?gender=kids"
-                                            className={`text-button-uppercase duration-300 h-full flex items-center justify-center gap-1 ${pathname.includes('gender=kids') ? 'active' : ''}`}
-                                        >
-                                            Kids
-                                        </Link>
-                                        <div className="sub-menu py-3 px-5 -left-10 w-max absolute bg-white rounded-b-xl">
-                                            <ul>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('kids', 'toy')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Boy&apos;s Toy
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('kids', 'blanket')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Baby Blanket
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderTypeClick('kids', 'clothing')} className="link text-secondary duration-300 cursor-pointer">
-                                                        Newborn Clothing
-                                                    </div>
-                                                </li>
-                                                <li>
-                                                    <div onClick={() => handleGenderClick('kids')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                        View All
-                                                    </div>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </li>
+                                    {categoryGroups.map((group) => (
+                                        <li key={group.name} className='h-full relative'>
+                                            <Link
+                                                href={`/shop/breadcrumb1?gender=${genderParam(group.name)}`}
+                                                className={`text-button-uppercase duration-300 h-full flex items-center justify-center gap-1 ${pathname.includes(`gender=${genderParam(group.name)}`) ? 'active' : ''}`}
+                                            >
+                                                {group.name}
+                                            </Link>
+                                            <div className="sub-menu py-3 px-5 -left-10 w-max absolute bg-white rounded-b-xl">
+                                                <ul>
+                                                    {group.subcategories.map((sc) => (
+                                                        <li key={sc.id}>
+                                                            <div
+                                                                onClick={() => router.push(`/shop/breadcrumb1?gender=${genderParam(group.name)}&type=${typeParam(sc.name)}`)}
+                                                                className="link text-secondary duration-300 cursor-pointer"
+                                                            >
+                                                                {sc.name}
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                    <li>
+                                                        <div
+                                                            onClick={() => router.push(`/shop/breadcrumb1?gender=${genderParam(group.name)}`)}
+                                                            className="link text-secondary duration-300 cursor-pointer view-all-btn"
+                                                        >
+                                                            View All
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </li>
+                                    ))}
                                 </ul>
                             </div>
                         </div>
@@ -224,6 +240,7 @@ const MenuOne: React.FC<Props> = ({ props }) => {
                 </div>
             </div>
 
+            {/* Mobile nav */}
             <div id="menu-mobile" className={`${openMenuMobile ? 'open' : ''}`}>
                 <div className="menu-container bg-white h-full">
                     <div className="container h-full">
@@ -239,130 +256,52 @@ const MenuOne: React.FC<Props> = ({ props }) => {
                             </div>
                             <div className="form-search relative mt-2">
                                 <Icon.MagnifyingGlass size={20} className='absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer' />
-                                <input type="text" placeholder='What are you looking for?' className=' h-12 rounded-lg border border-line text-sm w-full pl-10 pr-4' />
+                                <input type="text" placeholder='What are you looking for?' className='h-12 rounded-lg border border-line text-sm w-full pl-10 pr-4' />
                             </div>
                             <div className="list-nav mt-6">
                                 <ul>
-                                    <li
-                                        className={`${openSubNavMobile === 1 ? 'open' : ''}`}
-                                        onClick={() => handleOpenSubNavMobile(1)}
-                                    >
-                                        <a href={'#!'} className='text-xl font-semibold flex items-center justify-between'>Men
-                                            <span className='text-right'>
-                                                <Icon.CaretRight size={20} />
-                                            </span>
-                                        </a>
-                                        <div className="sub-nav-mobile">
-                                            <div className="back-btn flex items-center gap-3" onClick={() => handleOpenSubNavMobile(1)}>
-                                                <Icon.CaretLeft />
-                                                Back
+                                    {categoryGroups.map((group, index) => (
+                                        <li
+                                            key={group.name}
+                                            className={`${index > 0 ? 'mt-5' : ''} ${openSubNavMobile === index ? 'open' : ''}`}
+                                            onClick={() => handleOpenSubNavMobile(index)}
+                                        >
+                                            <a href={'#!'} className='text-xl font-semibold flex items-center justify-between'>
+                                                {group.name}
+                                                <span className='text-right'>
+                                                    <Icon.CaretRight size={20} />
+                                                </span>
+                                            </a>
+                                            <div className="sub-nav-mobile">
+                                                <div className="back-btn flex items-center gap-3" onClick={() => handleOpenSubNavMobile(index)}>
+                                                    <Icon.CaretLeft />
+                                                    Back
+                                                </div>
+                                                <div className="list-nav-item w-full pt-2 pb-6">
+                                                    <ul>
+                                                        {group.subcategories.map((sc) => (
+                                                            <li key={sc.id}>
+                                                                <div
+                                                                    onClick={() => router.push(`/shop/breadcrumb1?gender=${genderParam(group.name)}&type=${typeParam(sc.name)}`)}
+                                                                    className="link text-secondary duration-300 cursor-pointer"
+                                                                >
+                                                                    {sc.name}
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                        <li>
+                                                            <div
+                                                                onClick={() => router.push(`/shop/breadcrumb1?gender=${genderParam(group.name)}`)}
+                                                                className="link text-secondary duration-300 cursor-pointer view-all-btn"
+                                                            >
+                                                                View All
+                                                            </div>
+                                                        </li>
+                                                    </ul>
+                                                </div>
                                             </div>
-                                            <div className="list-nav-item w-full pt-2 pb-6">
-                                                <ul>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('men', 'outerwear')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Outerwear | Coats
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('men', 'sweater')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Sweaters | Cardigans
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('men', 'shirt')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Shirt | Sweatshirts
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderClick('men')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                            View All
-                                                        </div>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li
-                                        className={`${openSubNavMobile === 2 ? 'open' : ''}`}
-                                        onClick={() => handleOpenSubNavMobile(2)}
-                                    >
-                                        <a href={'#!'} className='text-xl font-semibold flex items-center justify-between mt-5'>Women
-                                            <span className='text-right'>
-                                                <Icon.CaretRight size={20} />
-                                            </span>
-                                        </a>
-                                        <div className="sub-nav-mobile">
-                                            <div className="back-btn flex items-center gap-3" onClick={() => handleOpenSubNavMobile(2)}>
-                                                <Icon.CaretLeft />
-                                                Back
-                                            </div>
-                                            <div className="list-nav-item w-full pt-2 pb-6">
-                                                <ul>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('women', 'dress')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Dresses | Jumpsuits
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('women', 't-shirt')} className="link text-secondary duration-300 cursor-pointer">
-                                                            T-shirts | Sweatshirts
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('women', 'accessories')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Accessories | Jewelry
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderClick('women')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                            View All
-                                                        </div>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li
-                                        className={`${openSubNavMobile === 3 ? 'open' : ''}`}
-                                        onClick={() => handleOpenSubNavMobile(3)}
-                                    >
-                                        <a href={'#!'} className='text-xl font-semibold flex items-center justify-between mt-5'>Kids
-                                            <span className='text-right'>
-                                                <Icon.CaretRight size={20} />
-                                            </span>
-                                        </a>
-                                        <div className="sub-nav-mobile">
-                                            <div className="back-btn flex items-center gap-3" onClick={() => handleOpenSubNavMobile(3)}>
-                                                <Icon.CaretLeft />
-                                                Back
-                                            </div>
-                                            <div className="list-nav-item w-full pt-2 pb-6">
-                                                <ul>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('kids', 'toy')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Boy&apos;s Toy
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('kids', 'blanket')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Baby Blanket
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderTypeClick('kids', 'clothing')} className="link text-secondary duration-300 cursor-pointer">
-                                                            Newborn Clothing
-                                                        </div>
-                                                    </li>
-                                                    <li>
-                                                        <div onClick={() => handleGenderClick('kids')} className="link text-secondary duration-300 cursor-pointer view-all-btn">
-                                                            View All
-                                                        </div>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </li>
+                                        </li>
+                                    ))}
                                 </ul>
                             </div>
                         </div>

@@ -72,8 +72,7 @@ const FeaturedProduct: React.FC<Props> = ({ data }) => {
         openModalCart()
     };
 
-    // Infor product 39th in data
-    const productMain = data[39];
+    const productMain = data.find(p => p.isFeatured) ?? data[0];
     const percentSale = Math.floor(100 - ((productMain.price / productMain.originPrice) * 100))
 
     return (

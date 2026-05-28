@@ -11,6 +11,15 @@ import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { useCart } from '@/context/CartContext'
 import { countdownTime } from '@/store/countdownTime'
 
+interface DiscountCode {
+    id: number
+    code: string
+    discount_percent: number
+    min_order_amount: number
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+
 const Cart = () => {
     const [timeLeft, setTimeLeft] = useState(countdownTime());
     const router = useRouter()
@@ -19,44 +28,40 @@ const Cart = () => {
         const timer = setInterval(() => {
             setTimeLeft(countdownTime());
         }, 1000);
-
         return () => clearInterval(timer);
     }, []);
 
     const { cartState, updateCart, removeFromCart, clearCart } = useCart();
 
     const handleQuantityChange = (productId: string, newQuantity: number) => {
-        // Tìm sản phẩm trong giỏ hàng
         const itemToUpdate = cartState.cartArray.find((item) => item.id === productId);
-
-        // Kiểm tra xem sản phẩm có tồn tại không
         if (itemToUpdate) {
-            // Truyền giá trị hiện tại của selectedSize và selectedColor
             updateCart(productId, newQuantity, itemToUpdate.selectedSize, itemToUpdate.selectedColor);
         }
     };
 
+    const [discountCodes, setDiscountCodes] = useState<DiscountCode[]>([])
+    const [copiedCode, setCopiedCode] = useState<string>('')
+
+    useEffect(() => {
+        fetch(`${API_BASE}/inventory/discount-codes`)
+            .then(r => r.json())
+            .then(data => setDiscountCodes(Array.isArray(data) ? data : []))
+            .catch(() => {})
+    }, [])
+
+    const handleCopyCode = (code: string) => {
+        navigator.clipboard.writeText(code).then(() => {
+            setCopiedCode(code)
+            setTimeout(() => setCopiedCode(''), 2000)
+        })
+    }
+
     let moneyForFreeship = 150;
     let [totalCart, setTotalCart] = useState<number>(0)
-    let [discountCart, setDiscountCart] = useState<number>(0)
     let [shipCart, setShipCart] = useState<number>(30)
-    let [applyCode, setApplyCode] = useState<number>(0)
 
     cartState.cartArray.map(item => totalCart += item.price * item.quantity)
-
-    const handleApplyCode = (minValue: number, discount: number) => {
-        if (totalCart > minValue) {
-            setApplyCode(minValue)
-            setDiscountCart(discount)
-        } else {
-            alert(`Minimum order must be ${minValue}$`)
-        }
-    }
-
-    if (totalCart < applyCode) {
-        applyCode = 0
-        discountCart = 0
-    }
 
     if (totalCart < moneyForFreeship) {
         shipCart = 30
@@ -67,7 +72,7 @@ const Cart = () => {
     }
 
     const redirectToCheckout = () => {
-        router.push(`/checkout?discount=${discountCart}&ship=${shipCart}`)
+        router.push(`/checkout?ship=${shipCart}`)
     }
 
     return (
@@ -90,7 +95,7 @@ const Cart = () => {
                             </div>
                             <div className="heading banner mt-5">
                                 <div className="text">Buy
-                                    <span className="text-button"> $<span className="more-price">{moneyForFreeship - totalCart > 0 ? (<>{moneyForFreeship - totalCart}</>) : (0)}</span>.00 </span>
+                                    <span className="text-button"> PKR <span className="more-price">{moneyForFreeship - totalCart > 0 ? (<>{moneyForFreeship - totalCart}</>) : (0)}</span>.00 </span>
                                     <span>more to get </span>
                                     <span className="text-button">freeship</span>
                                 </div>
@@ -154,7 +159,7 @@ const Cart = () => {
                                                         </div>
                                                     </div>
                                                     <div className="w-1/12 price flex items-center justify-center">
-                                                        <div className="text-title text-center">${product.price}.00</div>
+                                                        <div className="text-title text-center">PKR {product.price}.00</div>
                                                     </div>
                                                     <div className="w-1/6 flex items-center justify-center">
                                                         <div className="quantity-block bg-surface md:p-3 p-2 flex items-center justify-between rounded-lg border border-line md:w-[100px] flex-shrink-0 w-20">
@@ -174,14 +179,12 @@ const Cart = () => {
                                                         </div>
                                                     </div>
                                                     <div className="w-1/6 flex total-price items-center justify-center">
-                                                        <div className="text-title text-center">${product.quantity * product.price}.00</div>
+                                                        <div className="text-title text-center">PKR {product.quantity * product.price}.00</div>
                                                     </div>
                                                     <div className="w-1/12 flex items-center justify-center">
                                                         <Icon.XCircle
                                                             className='text-xl max-md:text-base text-red cursor-pointer hover:text-black duration-500'
-                                                            onClick={() => {
-                                                                removeFromCart(product.id)
-                                                            }}
+                                                            onClick={() => removeFromCart(product.id)}
                                                         />
                                                     </div>
                                                 </div>
@@ -190,86 +193,40 @@ const Cart = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="input-block discount-code w-full h-12 sm:mt-7 mt-5">
-                                <form className='w-full h-full relative'>
-                                    <input type="text" placeholder='Add voucher discount' className='w-full h-full bg-surface pl-4 pr-14 rounded-lg border border-line' required />
-                                    <button className='button-main absolute top-1 bottom-1 right-1 px-5 rounded-lg flex items-center justify-center'>Apply Code
-                                    </button>
-                                </form>
-                            </div>
-                            <div className="list-voucher flex items-center gap-5 flex-wrap sm:mt-7 mt-5">
-                                <div className={`item ${applyCode === 200 ? 'bg-green' : ''} border border-line rounded-lg py-2`}>
-                                    <div className="top flex gap-10 justify-between px-3 pb-2 border-b border-dashed border-line">
-                                        <div className="left">
-                                            <div className="caption1">Discount</div>
-                                            <div className="caption1 font-bold">10% OFF</div>
+                            {discountCodes.length > 0 && (
+                                <div className="list-voucher flex items-center gap-5 flex-wrap sm:mt-7 mt-5">
+                                    {discountCodes.map(dc => (
+                                        <div key={dc.id} className="item border border-line rounded-lg py-2">
+                                            <div className="top flex gap-10 justify-between px-3 pb-2 border-b border-dashed border-line">
+                                                <div className="left">
+                                                    <div className="caption1">Discount</div>
+                                                    <div className="caption1 font-bold">{dc.discount_percent}% OFF</div>
+                                                </div>
+                                                <div className="right">
+                                                    <div className="caption1">For all orders <br />from PKR {dc.min_order_amount}</div>
+                                                </div>
+                                            </div>
+                                            <div className="bottom gap-6 items-center flex justify-between px-3 pt-2">
+                                                <div className="text-button-uppercase">Code: {dc.code}</div>
+                                                <div
+                                                    className="py-1 px-3 rounded-full text-xs font-semibold cursor-pointer capitalize"
+                                                    style={{ backgroundColor: '#000', color: '#fff' }}
+                                                    onClick={() => handleCopyCode(dc.code)}
+                                                >
+                                                    {copiedCode === dc.code ? 'Copied!' : 'Copy Code'}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="right">
-                                            <div className="caption1">For all orders <br />from 200$</div>
-                                        </div>
-                                    </div>
-                                    <div className="bottom gap-6 items-center flex justify-between px-3 pt-2">
-                                        <div className="text-button-uppercase">Code: AN6810</div>
-                                        <div
-                                            className="button-main py-1 px-2.5 capitalize text-xs"
-                                            onClick={() => handleApplyCode(200, Math.floor((totalCart / 100) * 10))}
-                                        >
-                                            {applyCode === 200 ? 'Applied' : 'Apply Code'}
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
-                                <div className={`item ${applyCode === 300 ? 'bg-green' : ''} border border-line rounded-lg py-2`}>
-                                    <div className="top flex gap-10 justify-between px-3 pb-2 border-b border-dashed border-line">
-                                        <div className="left">
-                                            <div className="caption1">Discount</div>
-                                            <div className="caption1 font-bold">15% OFF</div>
-                                        </div>
-                                        <div className="right">
-                                            <div className="caption1">For all orders <br />from 300$</div>
-                                        </div>
-                                    </div>
-                                    <div className="bottom gap-6 items-center flex justify-between px-3 pt-2">
-                                        <div className="text-button-uppercase">Code: AN6810</div>
-                                        <div
-                                            className="button-main py-1 px-2.5 capitalize text-xs"
-                                            onClick={() => handleApplyCode(300, Math.floor((totalCart / 100) * 15))}
-                                        >
-                                            {applyCode === 300 ? 'Applied' : 'Apply Code'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className={`item ${applyCode === 400 ? 'bg-green' : ''} border border-line rounded-lg py-2`}>
-                                    <div className="top flex gap-10 justify-between px-3 pb-2 border-b border-dashed border-line">
-                                        <div className="left">
-                                            <div className="caption1">Discount</div>
-                                            <div className="caption1 font-bold">20% OFF</div>
-                                        </div>
-                                        <div className="right">
-                                            <div className="caption1">For all orders <br />from 400$</div>
-                                        </div>
-                                    </div>
-                                    <div className="bottom gap-6 items-center flex justify-between px-3 pt-2">
-                                        <div className="text-button-uppercase">Code: AN6810</div>
-                                        <div
-                                            className="button-main py-1 px-2.5 capitalize text-xs"
-                                            onClick={() => handleApplyCode(400, Math.floor((totalCart / 100) * 20))}
-                                        >
-                                            {applyCode === 400 ? 'Applied' : 'Apply Code'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            )}
                         </div>
                         <div className="xl:w-1/3 xl:pl-12 w-full">
                             <div className="checkout-block bg-surface p-6 rounded-2xl">
                                 <div className="heading5">Order Summary</div>
                                 <div className="total-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">Subtotal</div>
-                                    <div className="text-title">$<span className="total-product">{totalCart}</span><span>.00</span></div>
-                                </div>
-                                <div className="discount-block py-5 flex justify-between border-b border-line">
-                                    <div className="text-title">Discounts</div>
-                                    <div className="text-title"> <span>-$</span><span className="discount">{discountCart}</span><span>.00</span></div>
+                                    <div className="text-title">PKR <span className="total-product">{totalCart}</span><span>.00</span></div>
                                 </div>
                                 <div className="ship-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">Shipping</div>
@@ -293,7 +250,7 @@ const Cart = () => {
                                                             onChange={() => setShipCart(0)}
                                                         />
                                                     )}
-                                                < label className="pl-1" htmlFor="shipping">Free Shipping:</label>
+                                                <label className="pl-1" htmlFor="shipping">Free Shipping:</label>
                                             </div>
                                             <div className="type mt-1">
                                                 <input
@@ -319,17 +276,15 @@ const Cart = () => {
                                             </div>
                                         </div>
                                         <div className="right">
-                                            <div className="ship">$0.00</div>
-                                            <div className="local text-on-surface-variant1 mt-1">$30.00</div>
-                                            <div className="flat text-on-surface-variant1 mt-1">$40.00</div>
+                                            <div className="ship">PKR 0.00</div>
+                                            <div className="local text-on-surface-variant1 mt-1">PKR 30.00</div>
+                                            <div className="flat text-on-surface-variant1 mt-1">PKR 40.00</div>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="total-cart-block pt-4 pb-4 flex justify-between">
                                     <div className="heading5">Total</div>
-                                    <div className="heading5">$
-                                        <span className="total-cart heading5">{totalCart - discountCart + shipCart}</span>
-                                        <span className='heading5'>.00</span></div>
+                                    <div className="heading5">PKR <span className="total-cart heading5">{totalCart + shipCart}</span><span className='heading5'>.00</span></div>
                                 </div>
                                 <div className="block-button flex flex-col items-center gap-y-4 mt-5">
                                     <div className="checkout-btn button-main text-center w-full" onClick={redirectToCheckout}>Process To Checkout</div>
@@ -339,7 +294,7 @@ const Cart = () => {
                         </div>
                     </div>
                 </div>
-            </div >
+            </div>
             <Footer />
         </>
     )

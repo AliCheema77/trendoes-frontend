@@ -9,7 +9,7 @@ import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
 import Footer from '@/components/Footer/Footer'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { useAuth } from '@/context/AuthContext'
-import { fetchUserProfile, updateUserProfile } from '@/lib/api'
+import { fetchUserProfile, updateUserProfile, fetchAddresses, createAddress, updateAddress, deleteAddress } from '@/lib/api'
 
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-yellow text-yellow',
@@ -20,6 +20,14 @@ const STATUS_COLORS: Record<string, string> = {
     cancelled: 'bg-red text-red',
     refunded: 'bg-red text-red',
 }
+
+interface Address {
+    id: number; label: string; full_name: string; phone: string
+    street: string; city: string; postal_code: string; country: string
+    is_default: boolean; created_at: string
+}
+
+const EMPTY_ADDR = { label: '', full_name: '', phone: '', street: '', city: '', postal_code: '', country: 'Pakistan', is_default: false }
 
 interface OrderItem {
     id: number
@@ -53,6 +61,18 @@ const MyAccount = () => {
     const [settingSaving, setSettingSaving] = useState(false)
     const [settingMsg, setSettingMsg] = useState<string | null>(null)
     const [settingError, setSettingError] = useState<string | null>(null)
+    const [addresses, setAddresses] = useState<Address[]>([])
+    const [addressLoading, setAddressLoading] = useState(false)
+    const [addressesFetched, setAddressesFetched] = useState(false)
+    const [showAddressForm, setShowAddressForm] = useState(false)
+    const [editingAddress, setEditingAddress] = useState<Address | null>(null)
+    const [addressForm, setAddressForm] = useState(EMPTY_ADDR)
+    const [addressSaving, setAddressSaving] = useState(false)
+    const [addressMsg, setAddressMsg] = useState<string | null>(null)
+    const [addressError, setAddressError] = useState<string | null>(null)
+    const [addAddrBtnHover, setAddAddrBtnHover] = useState(false)
+    const [saveAddrBtnHover, setSaveAddrBtnHover] = useState(false)
+    const [saveSettingsBtnHover, setSaveSettingsBtnHover] = useState(false)
 
     useEffect(() => {
         if (!isLoading && !user) {
@@ -62,7 +82,7 @@ const MyAccount = () => {
 
     useEffect(() => {
         if (!accessToken) return
-        fetchUserProfile(accessToken)
+        fetchUserProfile()
             .then(data => {
                 setOrders(data['order data'] || [])
                 const u = data['user information ']
@@ -78,13 +98,70 @@ const MyAccount = () => {
         setSettingError(null)
         setSettingSaving(true)
         try {
-            await updateUserProfile(accessToken!, settingForm)
+            await updateUserProfile(settingForm)
             setSettingMsg('Profile saved successfully.')
         } catch {
             setSettingError('Failed to save. Please try again.')
         } finally {
             setSettingSaving(false)
         }
+    }
+
+    useEffect(() => {
+        if (activeTab !== 'address' || addressesFetched || !accessToken) return
+        setAddressLoading(true)
+        fetchAddresses()
+            .then(data => setAddresses(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => { setAddressLoading(false); setAddressesFetched(true) })
+    }, [activeTab, accessToken, addressesFetched])
+
+    const handleAddressSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setAddressSaving(true); setAddressMsg(null); setAddressError(null)
+        try {
+            if (editingAddress) {
+                const updated = await updateAddress(editingAddress.id, addressForm)
+                setAddresses(prev => prev.map(a => {
+                    if (a.id === editingAddress.id) return updated
+                    if (addressForm.is_default) return { ...a, is_default: false }
+                    return a
+                }))
+            } else {
+                const created = await createAddress(addressForm)
+                setAddresses(prev => [
+                    ...(addressForm.is_default ? prev.map(a => ({ ...a, is_default: false })) : prev),
+                    created,
+                ])
+            }
+            setAddressMsg(editingAddress ? 'Address updated.' : 'Address added.')
+            setShowAddressForm(false); setEditingAddress(null); setAddressForm(EMPTY_ADDR)
+        } catch {
+            setAddressError('Failed to save address. Please try again.')
+        } finally { setAddressSaving(false) }
+    }
+
+    const handleDeleteAddress = async (id: number) => {
+        if (!confirm('Delete this address?')) return
+        try {
+            await deleteAddress(id)
+            setAddresses(prev => prev.filter(a => a.id !== id))
+        } catch { alert('Failed to delete address.') }
+    }
+
+    const handleSetDefault = async (addr: Address) => {
+        try {
+            await updateAddress(addr.id, { is_default: true })
+            setAddresses(prev => prev.map(a => ({ ...a, is_default: a.id === addr.id })))
+        } catch { alert('Failed to set default address.') }
+    }
+
+    const openEditAddress = (addr: Address) => {
+        setEditingAddress(addr)
+        setAddressForm({ label: addr.label, full_name: addr.full_name, phone: addr.phone,
+            street: addr.street, city: addr.city, postal_code: addr.postal_code,
+            country: addr.country, is_default: addr.is_default })
+        setShowAddressForm(true); setAddressMsg(null); setAddressError(null)
     }
 
     const filteredOrders = activeOrders === 'all'
@@ -128,6 +205,7 @@ const MyAccount = () => {
                                     {[
                                         { id: 'dashboard', icon: <Icon.HouseLine size={20} />, label: 'Dashboard' },
                                         { id: 'orders', icon: <Icon.Package size={20} />, label: 'History Orders' },
+                                        { id: 'address', icon: <Icon.MapPin size={20} />, label: 'Addresses' },
                                         { id: 'setting', icon: <Icon.GearSix size={20} />, label: 'Setting' },
                                     ].map(tab => (
                                         <Link key={tab.id} href='#!' scroll={false} className={`item flex items-center gap-3 w-full px-5 py-4 rounded-lg cursor-pointer duration-300 hover:bg-white mt-1.5 ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
@@ -271,6 +349,112 @@ const MyAccount = () => {
                                     )}
                                 </div>
                             </div>
+                            {/* Address tab */}
+                            <div className={`tab text-content w-full p-7 border border-line rounded-xl ${activeTab === 'address' ? 'block' : 'hidden'}`}>
+                                <div className="flex items-center justify-between">
+                                    <h6 className="heading6">Saved Addresses</h6>
+                                    {!showAddressForm && (
+                                        <button
+                                            onClick={() => { setEditingAddress(null); setAddressForm(EMPTY_ADDR); setAddressMsg(null); setAddressError(null); setShowAddressForm(true) }}
+                                            onMouseEnter={() => setAddAddrBtnHover(true)}
+                                            onMouseLeave={() => setAddAddrBtnHover(false)}
+                                            style={{ padding: '10px 20px', background: addAddrBtnHover ? '#D2EF9A' : '#1F1F1F', color: addAddrBtnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all ease 0.4s' }}
+                                        >
+                                            + Add Address
+                                        </button>
+                                    )}
+                                </div>
+
+                                {addressMsg && <div className="text-sm mt-4 p-3 bg-green bg-opacity-10 text-green rounded-lg">{addressMsg}</div>}
+
+                                {showAddressForm && (
+                                    <form className="mt-5 border border-line rounded-xl p-5" onSubmit={handleAddressSubmit}>
+                                        <h6 className="heading6 mb-4">{editingAddress ? 'Edit Address' : 'New Address'}</h6>
+                                        {addressError && <div className="text-sm mb-4 p-3 bg-red bg-opacity-10 text-red rounded-lg">{addressError}</div>}
+                                        <div className="grid sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Label (e.g. Home)</label>
+                                                <input className="border-line px-4 py-3 w-full rounded-lg" placeholder="Home" value={addressForm.label} onChange={e => setAddressForm(p => ({ ...p, label: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Full Name *</label>
+                                                <input required className="border-line px-4 py-3 w-full rounded-lg" placeholder="Full Name" value={addressForm.full_name} onChange={e => setAddressForm(p => ({ ...p, full_name: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Phone *</label>
+                                                <input required className="border-line px-4 py-3 w-full rounded-lg" placeholder="Phone" value={addressForm.phone} onChange={e => setAddressForm(p => ({ ...p, phone: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Street *</label>
+                                                <input required className="border-line px-4 py-3 w-full rounded-lg" placeholder="Street address" value={addressForm.street} onChange={e => setAddressForm(p => ({ ...p, street: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">City *</label>
+                                                <input required className="border-line px-4 py-3 w-full rounded-lg" placeholder="City" value={addressForm.city} onChange={e => setAddressForm(p => ({ ...p, city: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Postal Code</label>
+                                                <input className="border-line px-4 py-3 w-full rounded-lg" placeholder="Postal Code" value={addressForm.postal_code} onChange={e => setAddressForm(p => ({ ...p, postal_code: e.target.value }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-title text-sm mb-1 block">Country *</label>
+                                                <input required className="border-line px-4 py-3 w-full rounded-lg" placeholder="Country" value={addressForm.country} onChange={e => setAddressForm(p => ({ ...p, country: e.target.value }))} />
+                                            </div>
+                                            <div className="flex items-center gap-3 sm:col-span-2 mt-2">
+                                                <input type="checkbox" id="addr_is_default" checked={addressForm.is_default} onChange={e => setAddressForm(p => ({ ...p, is_default: e.target.checked }))} />
+                                                <label htmlFor="addr_is_default" className="text-title text-sm cursor-pointer">Set as default address</label>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 mt-6">
+                                            <button
+                                                type="submit"
+                                                disabled={addressSaving}
+                                                onMouseEnter={() => setSaveAddrBtnHover(true)}
+                                                onMouseLeave={() => setSaveAddrBtnHover(false)}
+                                                style={{ padding: '10px 24px', background: saveAddrBtnHover ? '#D2EF9A' : '#1F1F1F', color: saveAddrBtnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: addressSaving ? 'not-allowed' : 'pointer', opacity: addressSaving ? 0.7 : 1, transition: 'all ease 0.4s' }}
+                                            >
+                                                {addressSaving ? 'Saving...' : editingAddress ? 'Update Address' : 'Save Address'}
+                                            </button>
+                                            <button type="button" onClick={() => { setShowAddressForm(false); setEditingAddress(null); setAddressMsg(null); setAddressError(null) }} style={{ padding: '10px 24px', border: '1px solid #e0e0e0', borderRadius: 8, fontSize: 14, fontWeight: 600 }}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {addressLoading ? (
+                                    <div className="flex justify-center py-10">
+                                        <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : (
+                                    <div className="grid sm:grid-cols-2 gap-4 mt-6">
+                                        {addresses.length === 0 && !showAddressForm && (
+                                            <p className="text-secondary col-span-2 text-center py-8">No saved addresses yet.</p>
+                                        )}
+                                        {addresses.map(addr => (
+                                            <div key={addr.id} className={`p-5 border rounded-xl relative ${addr.is_default ? 'border-black' : 'border-line'}`}>
+                                                {addr.is_default && (
+                                                    <span className="absolute top-3 right-3 text-xs font-semibold bg-black text-white px-2 py-0.5 rounded-full">Default</span>
+                                                )}
+                                                {addr.label && <div className="caption1 text-secondary mb-1">{addr.label}</div>}
+                                                <div className="text-title font-semibold">{addr.full_name}</div>
+                                                <div className="caption1 text-secondary mt-1">{addr.phone}</div>
+                                                <div className="caption1 text-secondary mt-1">{addr.street}</div>
+                                                <div className="caption1 text-secondary">{addr.city}{addr.postal_code ? `, ${addr.postal_code}` : ''}</div>
+                                                <div className="caption1 text-secondary">{addr.country}</div>
+                                                <div className="flex gap-3 mt-4 items-center">
+                                                    <button onClick={() => openEditAddress(addr)} className="text-sm text-title underline underline-offset-2 hover:opacity-70">Edit</button>
+                                                    {!addr.is_default && (
+                                                        <button onClick={() => handleSetDefault(addr)} className="text-sm text-secondary hover:text-black">Set default</button>
+                                                    )}
+                                                    <button onClick={() => handleDeleteAddress(addr.id)} className="text-sm text-red hover:opacity-70 ml-auto">Delete</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Setting tab */}
                             <div className={`tab text-content w-full p-7 border border-line rounded-xl ${activeTab === 'setting' ? 'block' : 'hidden'}`}>
                                 <h6 className="heading6">Account Settings</h6>
@@ -319,7 +503,13 @@ const MyAccount = () => {
                                         </div>
                                     </div>
                                     <div className="mt-6">
-                                        <button className="button-main" type="submit" disabled={settingSaving}>
+                                        <button
+                                            type="submit"
+                                            disabled={settingSaving}
+                                            onMouseEnter={() => setSaveSettingsBtnHover(true)}
+                                            onMouseLeave={() => setSaveSettingsBtnHover(false)}
+                                            style={{ padding: '14px 32px', background: saveSettingsBtnHover ? '#D2EF9A' : '#1F1F1F', color: saveSettingsBtnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', cursor: settingSaving ? 'not-allowed' : 'pointer', opacity: settingSaving ? 0.7 : 1, transition: 'all ease 0.4s' }}
+                                        >
                                             {settingSaving ? 'Saving...' : 'Save Changes'}
                                         </button>
                                     </div>

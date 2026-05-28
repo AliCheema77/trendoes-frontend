@@ -48,14 +48,12 @@ const ModalQuickview = () => {
 
     const handleIncreaseQuantity = () => {
         if (selectedProduct) {
-            selectedProduct.quantityPurchase += 1
             updateCart(selectedProduct.id, selectedProduct.quantityPurchase + 1, activeSize, activeColor);
         }
     };
 
     const handleDecreaseQuantity = () => {
         if (selectedProduct && selectedProduct.quantityPurchase > 1) {
-            selectedProduct.quantityPurchase -= 1
             updateCart(selectedProduct.id, selectedProduct.quantityPurchase - 1, activeSize, activeColor);
         }
     };

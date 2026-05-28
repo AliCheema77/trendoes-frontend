@@ -1,7 +1,9 @@
-import React from 'react'
+'use client'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
+import { subscribeNewsletter } from '@/lib/api'
 
 // Social links come from .env.local — update those values, not this file
 const SOCIAL = {
@@ -13,6 +15,27 @@ const SOCIAL = {
 }
 
 const Footer = () => {
+    const [newsletterEmail, setNewsletterEmail] = useState('')
+    const [newsletterLoading, setNewsletterLoading] = useState(false)
+    const [newsletterMsg, setNewsletterMsg] = useState('')
+    const [newsletterError, setNewsletterError] = useState('')
+
+    const handleNewsletter = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setNewsletterMsg('')
+        setNewsletterError('')
+        setNewsletterLoading(true)
+        try {
+            const data = await subscribeNewsletter(newsletterEmail.trim())
+            setNewsletterMsg(data.msg)
+            setNewsletterEmail('')
+        } catch (err: any) {
+            setNewsletterError(err?.error || 'Something went wrong. Please try again.')
+        } finally {
+            setNewsletterLoading(false)
+        }
+    }
+
     return (
         <div id="footer" className='footer'>
             <div className="footer-main bg-surface">
@@ -63,13 +86,32 @@ const Footer = () => {
                                 <div className="text-button-uppercase">Newsletter</div>
                                 <div className="caption1 mt-3">Sign up and get 10% off your first order</div>
                                 <div className="input-block w-full h-[52px] mt-4">
-                                    <form className='w-full h-full relative' action="post">
-                                        <input type="email" placeholder='Enter your e-mail' className='caption1 w-full h-full pl-4 pr-14 rounded-xl border border-line' required />
-                                        <button className='w-[44px] h-[44px] bg-black flex items-center justify-center rounded-xl absolute top-1 right-1'>
+                                    <form className='w-full h-full relative' onSubmit={handleNewsletter}>
+                                        <input
+                                            type="email"
+                                            placeholder='Enter your e-mail'
+                                            className='caption1 w-full h-full pl-4 pr-14 rounded-xl border border-line'
+                                            value={newsletterEmail}
+                                            onChange={e => setNewsletterEmail(e.target.value)}
+                                            required
+                                            disabled={newsletterLoading}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={newsletterLoading}
+                                            className='w-[44px] h-[44px] bg-black flex items-center justify-center rounded-xl absolute top-1 right-1'
+                                            style={{ opacity: newsletterLoading ? 0.6 : 1, cursor: newsletterLoading ? 'not-allowed' : 'pointer' }}
+                                        >
                                             <Icon.ArrowRight size={24} color='#fff' />
                                         </button>
                                     </form>
                                 </div>
+                                {newsletterMsg && (
+                                    <div className="caption1 text-success mt-2">{newsletterMsg}</div>
+                                )}
+                                {newsletterError && (
+                                    <div className="caption1 text-red mt-2">{newsletterError}</div>
+                                )}
                                 <div className="list-social flex items-center gap-6 mt-4">
                                     <Link href={SOCIAL.facebook} target='_blank'>
                                         <div className="icon-facebook text-2xl text-black"></div>

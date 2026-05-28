@@ -14,6 +14,15 @@ import { useSearchParams } from 'next/navigation';
 import { createOrder } from '@/lib/api'
 import { StockEntry } from '@/type/ProductType'
 
+interface DiscountCode {
+    id: number
+    code: string
+    discount_percent: number
+    min_order_amount: number
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+
 function resolveStockIds(stocksRaw: StockEntry[] | undefined, sizeName: string, colorName: string) {
     if (!stocksRaw) return { sizeId: null, colorId: null }
     for (const s of stocksRaw) {
@@ -28,7 +37,6 @@ function resolveStockIds(stocksRaw: StockEntry[] | undefined, sizeName: string, 
 
 const Checkout = () => {
     const searchParams = useSearchParams()
-    const discount = Number(searchParams.get('discount') || 0)
     const ship = Number(searchParams.get('ship') || 0)
     const router = useRouter()
 
@@ -36,9 +44,51 @@ const Checkout = () => {
     const { user, accessToken } = useAuth()
 
     const subtotal = cartState.cartArray.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const total = subtotal - discount + ship
 
-    const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', country: '', city: '', street: '', postalCode: '', notes: '', coupon: '' })
+    const [appliedDiscount, setAppliedDiscount] = useState<number>(0)
+    const [appliedCode, setAppliedCode] = useState<string>('')
+    const [voucherInput, setVoucherInput] = useState<string>('')
+    const [voucherError, setVoucherError] = useState<string>('')
+    const [discountCodes, setDiscountCodes] = useState<DiscountCode[]>([])
+
+    useEffect(() => {
+        fetch(`${API_BASE}/inventory/discount-codes`)
+            .then(r => r.json())
+            .then(data => setDiscountCodes(Array.isArray(data) ? data : []))
+            .catch(() => {})
+    }, [])
+
+    const applyDiscount = async (code: string) => {
+        setVoucherError('')
+        try {
+            const res = await fetch(`${API_BASE}/inventory/validate-discount`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code.trim().toUpperCase(), cart_total: subtotal }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                setVoucherError(data.error || 'Invalid code')
+                setAppliedDiscount(0)
+                setAppliedCode('')
+            } else {
+                setAppliedDiscount(data.discount_amount)
+                setAppliedCode(data.code)
+                setVoucherError('')
+            }
+        } catch {
+            setVoucherError('Could not reach server')
+        }
+    }
+
+    const handleVoucherSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (voucherInput.trim()) applyDiscount(voucherInput)
+    }
+
+    const total = subtotal - appliedDiscount + ship
+
+    const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', country: '', city: '', street: '', postalCode: '', notes: '' })
     const [activePayment, setActivePayment] = useState('COD')
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
@@ -87,20 +137,21 @@ const Checkout = () => {
             postal_code: form.postalCode,
             country: form.country,
             payment_method: activePayment,
-            coupon_code: form.coupon || undefined,
+            coupon_code: appliedCode || undefined,
             notes: form.notes,
             subtotal,
             shipping_fee: ship,
-            discount,
+            discount: appliedDiscount,
             total,
             items,
         }
 
         setLoading(true)
         try {
-            await createOrder(payload, accessToken)
+            const order = await createOrder(payload)
+            sessionStorage.setItem('lastOrder', JSON.stringify(order))
             cartState.cartArray.forEach(item => removeFromCart(item.id))
-            router.push('/order-tracking')
+            router.push('/order-success')
         } catch (err: any) {
             const msgs = Object.values(err || {}).flat()
             setError(msgs.length > 0 ? (msgs[0] as string) : 'Failed to place order. Please try again.')
@@ -164,14 +215,60 @@ const Checkout = () => {
                                         <div>
                                             <input className="border-line px-4 py-3 w-full rounded-lg" id="postalCode" type="text" placeholder="Postal Code *" required value={form.postalCode} onChange={handleChange} />
                                         </div>
-                                        <div>
-                                            <input className="border-line px-4 py-3 w-full rounded-lg" id="coupon" type="text" placeholder="Coupon Code (optional)" value={form.coupon} onChange={handleChange} />
-                                        </div>
                                         <div className="col-span-full">
                                             <textarea className="border border-line px-4 py-3 w-full rounded-lg" id="notes" placeholder="Order notes (optional)" value={form.notes} onChange={handleChange as any} />
                                         </div>
                                     </div>
-                                    <div className="payment-block md:mt-10 mt-6">
+
+                                    <div className="voucher-block md:mt-8 mt-6">
+                                        <div className="heading5 mb-4">Discount Code</div>
+                                        <div className="input-block discount-code w-full h-12">
+                                            <form className='w-full h-full relative' onSubmit={handleVoucherSubmit}>
+                                                <input
+                                                    type="text"
+                                                    placeholder='Enter discount code'
+                                                    className='w-full h-full bg-surface pl-4 pr-36 rounded-lg border border-line'
+                                                    value={voucherInput}
+                                                    onChange={e => setVoucherInput(e.target.value)}
+                                                />
+                                                <button type="submit" className='button-main absolute top-1 bottom-1 right-1 px-5 rounded-lg flex items-center justify-center'>Apply Code</button>
+                                            </form>
+                                            {voucherError && <div className="caption1 text-red mt-1">{voucherError}</div>}
+                                            {appliedCode && <div className="caption1 text-green-600 mt-1 font-semibold">✓ Code {appliedCode} applied — PKR {appliedDiscount} off</div>}
+                                        </div>
+                                        {discountCodes.length > 0 && (
+                                            <div className="list-voucher flex items-center gap-5 flex-wrap mt-5">
+                                                {discountCodes.map(dc => (
+                                                    <div key={dc.id} className={`item ${appliedCode === dc.code ? 'bg-green' : ''} border border-line rounded-lg py-2`}>
+                                                        <div className="top flex gap-10 justify-between px-3 pb-2 border-b border-dashed border-line">
+                                                            <div className="left">
+                                                                <div className="caption1">Discount</div>
+                                                                <div className="caption1 font-bold">{dc.discount_percent}% OFF</div>
+                                                            </div>
+                                                            <div className="right">
+                                                                <div className="caption1">For all orders <br />from PKR {dc.min_order_amount}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bottom gap-6 items-center flex justify-between px-3 pt-2">
+                                                            <div className="text-button-uppercase">Code: {dc.code}</div>
+                                                            <div
+                                                                className="py-1 px-3 rounded-full text-xs font-semibold cursor-pointer capitalize"
+                                                                style={appliedCode === dc.code
+                                                                    ? { backgroundColor: '#fff', color: '#000', border: '1px solid #000' }
+                                                                    : { backgroundColor: '#000', color: '#fff' }
+                                                                }
+                                                                onClick={() => applyDiscount(dc.code)}
+                                                            >
+                                                                {appliedCode === dc.code ? 'Applied' : 'Apply Code'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="payment-block md:mt-8 mt-6">
                                         <div className="heading5">Payment Method:</div>
                                         <div className="list-payment mt-5">
                                             {[
@@ -190,7 +287,7 @@ const Checkout = () => {
                                         <button
                                             type="submit"
                                             disabled={loading || cartState.cartArray.length === 0}
-                                            style={{ width: '100%', padding: '14px', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: (loading || cartState.cartArray.length === 0) ? 'not-allowed' : 'pointer', opacity: (loading || cartState.cartArray.length === 0) ? 0.7 : 1 }}
+                                            className="custom-button-main w-full"
                                         >
                                             {loading ? 'Placing Order...' : 'Place Order'}
                                         </button>
@@ -229,10 +326,16 @@ const Checkout = () => {
                                         ))
                                     )}
                                 </div>
-                                <div className="discount-block py-5 flex justify-between border-b border-line">
-                                    <div className="text-title">Discount</div>
-                                    <div className="text-title">-PKR {discount}</div>
+                                <div className="subtotal-block py-5 flex justify-between border-b border-line">
+                                    <div className="text-title">Subtotal</div>
+                                    <div className="text-title">PKR {subtotal.toFixed(0)}</div>
                                 </div>
+                                {appliedDiscount > 0 && (
+                                    <div className="discount-block py-5 flex justify-between border-b border-line">
+                                        <div className="text-title">Discount ({appliedCode})</div>
+                                        <div className="text-title text-green-600">-PKR {appliedDiscount}</div>
+                                    </div>
+                                )}
                                 <div className="ship-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">Shipping</div>
                                     <div className="text-title">{ship === 0 ? 'Free' : `PKR ${ship}`}</div>

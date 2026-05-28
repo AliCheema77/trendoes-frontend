@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { loginUser, registerUser, fetchUserProfile, refreshAccessToken } from '@/lib/api'
+import { loginUser, registerUser, fetchUserProfile } from '@/lib/api'
 
 interface UserInfo {
   id: number
@@ -36,27 +36,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const restoreSession = useCallback(async () => {
-    const stored = localStorage.getItem('access_token')
     const refresh = localStorage.getItem('refresh_token')
-    if (!stored || !refresh) {
+    if (!refresh) {
       setIsLoading(false)
       return
     }
     try {
-      const profile = await fetchUserProfile(stored)
+      // apiFetchAuth handles expired access tokens automatically (refresh + retry)
+      const profile = await fetchUserProfile()
       setUser(profile['user information '])
-      setAccessToken(stored)
+      setAccessToken(localStorage.getItem('access_token'))
     } catch {
-      // Access token expired — try refresh
-      try {
-        const refreshed = await refreshAccessToken(refresh)
-        storeTokens(refreshed.access, refresh)
-        const profile = await fetchUserProfile(refreshed.access)
-        setUser(profile['user information '])
-        setAccessToken(refreshed.access)
-      } catch {
-        clearTokens()
-      }
+      clearTokens()
     } finally {
       setIsLoading(false)
     }
@@ -66,11 +57,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreSession()
   }, [restoreSession])
 
+  // Keep React state in sync when apiFetchAuth silently refreshes the token mid-session
+  useEffect(() => {
+    const onRefreshed = (e: Event) => setAccessToken((e as CustomEvent<string>).detail)
+    const onLogout = () => { setUser(null); setAccessToken(null) }
+    window.addEventListener('auth:token-refreshed', onRefreshed)
+    window.addEventListener('auth:logout', onLogout)
+    return () => {
+      window.removeEventListener('auth:token-refreshed', onRefreshed)
+      window.removeEventListener('auth:logout', onLogout)
+    }
+  }, [])
+
   const login = async (email: string, password: string) => {
     const data = await loginUser(email, password)
     storeTokens(data.access, data.refresh)
     setAccessToken(data.access)
-    const profile = await fetchUserProfile(data.access)
+    const profile = await fetchUserProfile()
     setUser(profile['user information '])
   }
 

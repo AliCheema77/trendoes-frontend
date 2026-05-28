@@ -79,7 +79,7 @@ export default async function BlogDetail({ params }: PageProps) {
                             <div className="body1 mt-8 whitespace-pre-wrap">{post.body}</div>
 
                             {/* Back link */}
-                            <Link href="/blog/default" className="button-main mt-10 inline-block">
+                            <Link href="/blog" className="button-main mt-10 inline-block">
                                 ← Back to Blog
                             </Link>
                         </div>
@@ -109,7 +109,7 @@ export default async function BlogDetail({ params }: PageProps) {
                                 </div>
 
                                 <div className="mt-8">
-                                    <Link href="/blog/default" className="text-button has-line-before">
+                                    <Link href="/blog" className="text-button has-line-before">
                                         All Posts
                                     </Link>
                                 </div>

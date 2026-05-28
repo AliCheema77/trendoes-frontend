@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import TopNavOne from '@/components/Header/TopNav/TopNavOne'
 import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
@@ -12,10 +12,13 @@ import { useAuth } from '@/context/AuthContext'
 const Login = () => {
     const { login } = useAuth()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const passwordReset = searchParams.get('reset') === '1'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [btnHover, setBtnHover] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -44,6 +47,11 @@ const Login = () => {
                         <div className="left md:w-1/2 w-full lg:pr-[60px] md:pr-[40px] md:border-r border-line">
                             <div className="heading4">Login</div>
                             <form className="md:mt-7 mt-4" onSubmit={handleSubmit}>
+                                {passwordReset && (
+                                    <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#166534', fontSize: '14px' }}>
+                                        Password reset successful. You can now log in with your new password.
+                                    </div>
+                                )}
                                 {error && <div className="text-red text-sm mb-4 p-3 bg-red bg-opacity-10 rounded-lg">{error}</div>}
                                 <div className="email">
                                     <input
@@ -79,7 +87,9 @@ const Login = () => {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        style={{ width: '100%', padding: '14px', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+                                        onMouseEnter={() => setBtnHover(true)}
+                                        onMouseLeave={() => setBtnHover(false)}
+                                        style={{ width: '100%', padding: '14px', background: btnHover ? '#D2EF9A' : '#1F1F1F', color: btnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, transition: 'all ease 0.4s' }}
                                     >
                                         {loading ? 'Logging in...' : 'Login'}
                                     </button>

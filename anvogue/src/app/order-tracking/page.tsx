@@ -6,7 +6,7 @@ import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
 import Footer from '@/components/Footer/Footer'
 import { useAuth } from '@/context/AuthContext'
-import { fetchUserProfile } from '@/lib/api'
+import { fetchUserProfile, trackGuestOrder } from '@/lib/api'
 
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-yellow text-yellow',
@@ -43,10 +43,33 @@ const OrderTracking = () => {
     const [loading, setLoading] = useState(false)
     const [openDetail, setOpenDetail] = useState<number | null>(null)
 
+    // Guest tracking state
+    const [guestOrderId, setGuestOrderId] = useState('')
+    const [guestEmail, setGuestEmail] = useState('')
+    const [guestLoading, setGuestLoading] = useState(false)
+    const [guestOrder, setGuestOrder] = useState<Order | null>(null)
+    const [guestError, setGuestError] = useState('')
+    const [trackBtnHover, setTrackBtnHover] = useState(false)
+
+    const handleGuestTrack = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setGuestError('')
+        setGuestOrder(null)
+        setGuestLoading(true)
+        try {
+            const data = await trackGuestOrder(guestEmail.trim(), parseInt(guestOrderId))
+            setGuestOrder(data)
+        } catch (err: any) {
+            setGuestError(err?.error || 'Something went wrong. Please try again.')
+        } finally {
+            setGuestLoading(false)
+        }
+    }
+
     useEffect(() => {
         if (!accessToken) return
         setLoading(true)
-        fetchUserProfile(accessToken)
+        fetchUserProfile()
             .then(data => setOrders(data['order data'] || []))
             .catch(() => {})
             .finally(() => setLoading(false))
@@ -143,18 +166,98 @@ const OrderTracking = () => {
                         <div className="content-main flex gap-y-8 max-md:flex-col">
                             <div className="left md:w-1/2 w-full lg:pr-[60px] md:pr-[40px] md:border-r border-line">
                                 <div className="heading4">Order Tracking</div>
-                                <div className="mt-2">To track your order please enter your Order ID in the box below and press the &quot;Track&quot; button. This was given to you on your receipt and in the confirmation email you should have received.</div>
-                                <form className="md:mt-7 mt-4">
-                                    <div className="email">
-                                        <input className="border-line px-4 pt-3 pb-3 w-full rounded-lg" id="username" type="email" placeholder="Username or email address *" required />
+                                <div className="mt-2">To track your order please enter your Order ID and the billing email you used at checkout, then press &quot;Track Order&quot;. These were included in your confirmation email.</div>
+                                <form className="md:mt-7 mt-4" onSubmit={handleGuestTrack}>
+                                    <div>
+                                        <input
+                                            className="border-line px-4 pt-3 pb-3 w-full rounded-lg"
+                                            type="number"
+                                            placeholder="Order ID *"
+                                            value={guestOrderId}
+                                            onChange={e => setGuestOrderId(e.target.value)}
+                                            required
+                                            min={1}
+                                        />
                                     </div>
-                                    <div className="billing mt-5">
-                                        <input className="border-line px-4 pt-3 pb-3 w-full rounded-lg" id="billing" type="email" placeholder="Billing Email *" required />
+                                    <div className="mt-5">
+                                        <input
+                                            className="border-line px-4 pt-3 pb-3 w-full rounded-lg"
+                                            type="email"
+                                            placeholder="Billing Email *"
+                                            value={guestEmail}
+                                            onChange={e => setGuestEmail(e.target.value)}
+                                            required
+                                        />
                                     </div>
+                                    {guestError && (
+                                        <div className="mt-4 text-red caption1">{guestError}</div>
+                                    )}
                                     <div className="block-button md:mt-7 mt-4">
-                                        <button className="button-main">Tracking Orders</button>
+                                        <button
+                                            type="submit"
+                                            disabled={guestLoading}
+                                            onMouseEnter={() => setTrackBtnHover(true)}
+                                            onMouseLeave={() => setTrackBtnHover(false)}
+                                            style={{ width: '100%', padding: '14px', background: trackBtnHover ? '#D2EF9A' : '#1F1F1F', color: trackBtnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', cursor: guestLoading ? 'not-allowed' : 'pointer', opacity: guestLoading ? 0.7 : 1, transition: 'all ease 0.4s' }}
+                                        >
+                                            {guestLoading ? 'Tracking…' : 'Track Order'}
+                                        </button>
                                     </div>
                                 </form>
+
+                                {/* Result */}
+                                {guestOrder && (
+                                    <div className="mt-8 border border-line rounded-xl overflow-hidden">
+                                        <div
+                                            className="flex flex-wrap items-center justify-between gap-4 p-5 bg-surface cursor-pointer"
+                                            onClick={() => setOpenDetail(openDetail === guestOrder.id ? null : guestOrder.id)}
+                                        >
+                                            <div className="flex items-center gap-6 flex-wrap">
+                                                <div>
+                                                    <span className="text-secondary text-sm">Order</span>
+                                                    <div className="text-button">#{guestOrder.id}</div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-secondary text-sm">Date</span>
+                                                    <div className="text-button">
+                                                        {new Date(guestOrder.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-secondary text-sm">Total</span>
+                                                    <div className="text-button">PKR {parseFloat(guestOrder.total).toFixed(0)}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className={`tag px-4 py-1.5 rounded-full bg-opacity-10 caption1 font-semibold capitalize ${STATUS_COLORS[guestOrder.status] || 'bg-yellow text-yellow'}`}>
+                                                    {guestOrder.status}
+                                                </span>
+                                                <span className="text-secondary text-sm">{openDetail === guestOrder.id ? '▲ Hide' : '▼ Details'}</span>
+                                            </div>
+                                        </div>
+                                        {openDetail === guestOrder.id && (
+                                            <div className="px-5 pb-5">
+                                                {(guestOrder.order_items ?? []).map(item => (
+                                                    <div key={item.id} className="flex items-center justify-between gap-4 py-4 border-b border-line last:border-0">
+                                                        <div>
+                                                            <div className="text-title">{item.product_name}</div>
+                                                            <div className="caption1 text-secondary mt-1">
+                                                                {item.size_name} / {item.color_name}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-title flex-shrink-0">
+                                                            {item.quantity} × PKR {parseFloat(item.price).toFixed(0)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div className="flex justify-between pt-4">
+                                                    <span className="text-button">Order Total</span>
+                                                    <span className="text-button">PKR {parseFloat(guestOrder.total).toFixed(0)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div className="right md:w-1/2 w-full lg:pl-[60px] md:pl-[40px] flex items-center">
                                 <div className="text-content">

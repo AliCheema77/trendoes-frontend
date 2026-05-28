@@ -34,6 +34,7 @@ const config: Config = {
       'success': '#3DAB25',
       'yellow': '#ECB018',
       'pink': '#F4407D',
+      'blue': '#3B82F6',
       'line': '#E9E9E9',
       'outline': 'rgba(0, 0, 0, 0.15)',
       'surface2': 'rgba(255, 255, 255, 0.2)',

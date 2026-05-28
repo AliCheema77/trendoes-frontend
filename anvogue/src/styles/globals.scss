@@ -11,6 +11,7 @@
   --success: #3DAB25;
   --yellow: #ECB018;
   --pink: #F4407D;
+  --blue: #3B82F6;
   --line: #E9E9E9;
   --outline: rgba(0, 0, 0, 0.15);
   --surface1: rgba(255, 255, 255, 0.1);
@@ -246,6 +247,29 @@ input[type="file"] {
       background-color: var(--black);
       color: var(--white);
     }
+  }
+}
+
+.custom-button-main {
+  display: inline-block;
+  padding: 12px 32px;
+  background-color: #000 !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  text-align: center;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 

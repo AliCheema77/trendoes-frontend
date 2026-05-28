@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ProductType } from '@/type/ProductType'
@@ -37,6 +38,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [activeSize, setActiveSize] = useState<string>('')
     const [activeSizeId, setActiveSizeId] = useState<number | undefined>(undefined)
     const [activeTab, setActiveTab] = useState<string | undefined>('description')
+    const router = useRouter()
     const { addToCart, updateCart, cartState } = useCart()
     const { openModalCart } = useModalCartContext()
     const { addToWishlist, removeFromWishlist, wishlistState } = useWishlist()
@@ -132,13 +134,11 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     }
 
     const handleIncreaseQuantity = () => {
-        productMain.quantityPurchase += 1
         updateCart(productMain.id, productMain.quantityPurchase + 1, activeSize, activeColor, activeSizeId, activeColorId);
     };
 
     const handleDecreaseQuantity = () => {
         if (productMain.quantityPurchase > 1) {
-            productMain.quantityPurchase -= 1
             updateCart(productMain.id, productMain.quantityPurchase - 1, activeSize, activeColor, activeSizeId, activeColorId);
         }
     };
@@ -165,6 +165,27 @@ const Default: React.FC<Props> = ({ data, productId }) => {
         updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor, activeSizeId, activeColorId)
         openModalCart()
     };
+
+    const handleBuyNow = () => {
+        if (useApiData && allColors.length > 0 && !activeColor) {
+            setCartError('Please select a color')
+            return
+        }
+        if (useApiData && allSizes.length > 0 && !activeSize) {
+            setCartError('Please select a size')
+            return
+        }
+        if (isCombinationSoldOut) {
+            setCartError('This combination is sold out')
+            return
+        }
+        setCartError('')
+        if (!cartState.cartArray.find(item => item.id === productMain.id)) {
+            addToCart({ ...productMain })
+        }
+        updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor, activeSizeId, activeColorId)
+        router.push('/checkout')
+    }
 
     const handleAddToWishlist = () => {
         // if product existed in wishlit, remove from wishlist and set state to false
@@ -453,7 +474,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     <div className="mt-2 caption1 text-red-500">{cartError}</div>
                                 )}
                                 <div className="button-block mt-5">
-                                    <div className="button-main w-full text-center">Buy It Now</div>
+                                    <div onClick={handleBuyNow} className="button-main w-full text-center">Buy It Now</div>
                                 </div>
                                 <div className="flex items-center lg:gap-20 gap-8 mt-5 pb-6 border-b border-line">
                                     <div className="compare flex items-center gap-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleAddToCompare() }}>

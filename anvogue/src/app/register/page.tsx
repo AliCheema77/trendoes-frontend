@@ -18,6 +18,7 @@ const Register = () => {
     const [agreed, setAgreed] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [btnHover, setBtnHover] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -107,7 +108,9 @@ const Register = () => {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        style={{ width: '100%', padding: '14px', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+                                        onMouseEnter={() => setBtnHover(true)}
+                                        onMouseLeave={() => setBtnHover(false)}
+                                        style={{ width: '100%', padding: '14px', background: btnHover ? '#D2EF9A' : '#1F1F1F', color: btnHover ? '#1F1F1F' : '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, transition: 'all ease 0.4s' }}
                                     >
                                         {loading ? 'Creating account...' : 'Create Account'}
                                     </button>
